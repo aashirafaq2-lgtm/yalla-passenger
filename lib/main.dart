@@ -63,8 +63,8 @@ class YallaApp extends StatelessWidget {
         primaryColor: AppColors.primaryOrange,
         scaffoldBackgroundColor: AppColors.offWhite,
         textTheme: GoogleFonts.outfitTextTheme(),
-        pageTransitionsTheme: const PageTransitionsTheme(
-          builders: {
+        pageTransitionsTheme: PageTransitionsTheme(
+          builders: const {
             TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
             TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           },

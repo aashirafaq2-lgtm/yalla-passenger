@@ -217,13 +217,6 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                           borderRadius: BorderRadius.circular(15),
                           border: Border.all(color: Colors.black12),
                         ),
-                        child: Container(
-                        height: 55,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: Colors.black12),
-                        ),
                         child: TextField(
                           controller: _discountCtrl,
                           decoration: const InputDecoration(
