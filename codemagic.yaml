@@ -9,9 +9,6 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.yalla.yallaPassenger
     scripts:
       - name: Organize Flutter structure
         script: |
@@ -24,8 +21,11 @@ workflows:
       - name: Set up dependencies
         script: |
           flutter packages pub get
-      - name: Set Xcode signing
+      - name: iOS Automatic Code Signing
         script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "com.yalla.yallaPassenger" --type IOS_APP_STORE --create
+          keychain add-certificates
           xcode-project use-profiles
       - name: Build iOS IPA
         script: |
