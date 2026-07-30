@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -61,7 +60,7 @@ class AdminDashboardScreen extends StatelessWidget {
         titlePadding: const EdgeInsets.only(left: 24, bottom: 16),
         title: Row(
           children: [
-            const Icon(FontAwesomeIcons.shieldHalved, color: AppColors.primaryOrange, size: 20),
+            const Icon(Icons.security, color: AppColors.primaryOrange, size: 20),
             const SizedBox(width: 12),
             Text('IQ ADMIN', style: AppTypography.h3Bold.copyWith(color: Colors.white, letterSpacing: -1)),
           ],
@@ -94,10 +93,10 @@ class AdminDashboardScreen extends StatelessWidget {
       mainAxisSpacing: 16,
       childAspectRatio: 1.1,
       children: [
-        _buildStatCard('Drivers', '452', FontAwesomeIcons.car, Colors.blue),
-        _buildStatCard('Passengers', '1.2k', FontAwesomeIcons.users, Colors.purple),
-        _buildStatCard('Live Rides', '84', FontAwesomeIcons.bolt, Colors.orange),
-        _buildStatCard('Revenue', '1.2M', FontAwesomeIcons.wallet, Colors.green),
+        _buildStatCard('Drivers', '452', Icons.directions_car, Colors.blue),
+        _buildStatCard('Passengers', '1.2k', Icons.people, Colors.purple),
+        _buildStatCard('Live Rides', '84', Icons.flash_on, Colors.orange),
+        _buildStatCard('Revenue', '1.2M', Icons.account_balance_wallet, Colors.green),
       ],
     );
   }
@@ -140,14 +139,14 @@ class AdminDashboardScreen extends StatelessWidget {
           color: const Color(0xFF050505),
           borderRadius: BorderRadius.circular(35),
           image: const DecorationImage(
-            image: AssetImage('assets/images/mesh_gradient.png'), // Placeholder or color pulse
+            image: AssetImage('assets/images/mesh_gradient.png'),
             fit: BoxFit.cover,
             opacity: 0.1,
           ),
         ),
         child: Column(
           children: [
-            const Icon(FontAwesomeIcons.circleCheck, color: Colors.greenAccent, size: 48),
+            const Icon(Icons.check_circle, color: Colors.greenAccent, size: 48),
             const SizedBox(height: 24),
             Text('System Integrity: Optimized', style: AppTypography.h3Bold.copyWith(color: Colors.white)),
             const SizedBox(height: 8),
