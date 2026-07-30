@@ -29,7 +29,7 @@ workflows:
           xcode-project use-profiles
       - name: Build iOS IPA
         script: |
-          flutter build ipa --release
+          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     publishing:
       app_store_connect:
         auth: integration
