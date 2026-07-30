@@ -24,10 +24,16 @@ workflows:
       - name: Set up dependencies
         script: |
           flutter packages pub get
-      - name: Build iOS IPA
+      - name: Build iOS App (No Codesign)
+        script: |
+          flutter build ios --release --no-codesign
+      - name: Build and Sign IPA
         script: |
           xcode-project use-profiles
-          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
+          xcode-project build-ipa \
+            --workspace "ios/Runner.xcworkspace" \
+            --scheme "Runner" \
+            --config "Release"
     publishing:
       app_store_connect:
         auth: integration
