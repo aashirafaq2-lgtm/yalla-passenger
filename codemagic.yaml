@@ -24,10 +24,12 @@ workflows:
       - name: Set up dependencies
         script: |
           flutter packages pub get
+      - name: Set Xcode signing
+        script: |
+          xcode-project use-profiles
       - name: Build iOS IPA
         script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+          flutter build ipa --release
     publishing:
       app_store_connect:
         auth: integration
