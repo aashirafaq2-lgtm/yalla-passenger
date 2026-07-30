@@ -26,6 +26,7 @@ workflows:
           flutter packages pub get
       - name: Build iOS IPA
         script: |
+          xcode-project use-profiles
           flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     publishing:
       app_store_connect:
