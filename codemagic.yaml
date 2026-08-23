@@ -19,6 +19,8 @@ workflows:
       - name: Build iOS App (No Codesign)
         script: |
           flutter pub run flutter_launcher_icons
+          echo "Force-stripping alpha channel from all icons..."
+          find ios/Runner/Assets.xcassets/AppIcon.appiconset -name "*.png" -exec sh -c 'sips -s format bmp "$1" --out temp.bmp && sips -s format png temp.bmp --out "$1" && rm temp.bmp' sh {} \;
           flutter build ios --release --no-codesign
       - name: Build and Sign IPA
         script: |
