@@ -10,7 +10,7 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.yalla.yallaPassenger
       flutter: stable
-      xcode: 16
+      xcode: latest
       cocoapods: default
     scripts:
       - name: Set up dependencies
