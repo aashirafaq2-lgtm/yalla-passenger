@@ -13,21 +13,11 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Organize Flutter structure
-        script: |
-          mkdir -p assets/images
-          mkdir -p lib
-          if [ -f "main.dart" ]; then
-            cp main.dart lib/main.dart
-          fi
-          flutter create . --platforms=ios --org com.yalla --no-pub
       - name: Set up dependencies
         script: |
           flutter packages pub get
       - name: Build iOS App (No Codesign)
         script: |
-          flutter packages pub get
-          flutter pub run flutter_launcher_icons
           flutter build ios --release --no-codesign
       - name: Build and Sign IPA
         script: |
