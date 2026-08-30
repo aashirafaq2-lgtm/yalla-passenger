@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/services/socket_service.dart';
+import '../../../core/services/storage_service.dart';
 import 'active_ride_screen.dart';
 
 class SearchingDriverScreen extends StatefulWidget {
-  const SearchingDriverScreen({super.key});
+  final Map<String, dynamic>? rideData;
+  const SearchingDriverScreen({super.key, this.rideData});
 
   @override
   State<SearchingDriverScreen> createState() => _SearchingDriverScreenState();
@@ -13,6 +17,7 @@ class SearchingDriverScreen extends StatefulWidget {
 
 class _SearchingDriverScreenState extends State<SearchingDriverScreen> with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
+  bool _driverAccepted = false;
 
   @override
   void initState() {
@@ -22,11 +27,58 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
       duration: const Duration(seconds: 2),
     )..repeat();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _dispatchRealtimeRideRequest();
+    });
+  }
+
+  void _dispatchRealtimeRideRequest() async {
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    final storageService = Provider.of<StorageService>(context, listen: false);
+    final userId = await storageService.getUserId() ?? 'passenger_${DateTime.now().millisecondsSinceEpoch}';
+
+    final payload = {
+      'id': widget.rideData?['id'] ?? 'ride_${DateTime.now().millisecondsSinceEpoch}',
+      'rideId': widget.rideData?['id'] ?? 'ride_${DateTime.now().millisecondsSinceEpoch}',
+      'passengerId': userId,
+      'passengerName': widget.rideData?['passengerName'] ?? 'Passenger',
+      'passengerPhone': widget.rideData?['passengerPhone'] ?? '07700000000',
+      'pickupName': widget.rideData?['pickupName'] ?? 'Current Location',
+      'dropName': widget.rideData?['dropName'] ?? 'Destination',
+      'pickupLat': widget.rideData?['pickupLat'] ?? 33.3152,
+      'pickupLng': widget.rideData?['pickupLng'] ?? 44.3661,
+      'dropLat': widget.rideData?['dropLat'] ?? 33.3000,
+      'dropLng': widget.rideData?['dropLng'] ?? 44.3800,
+      'estimatedPrice': widget.rideData?['estimatedPrice'] ?? 10000,
+      'serviceType': widget.rideData?['serviceType'] ?? 'Economy',
+    };
+
+    // Emit live request to all available online drivers
+    socketService.requestRide(payload);
+
+    // Listen for driver acceptance
+    socketService.onRideAccepted = (driverData) {
+      if (!mounted || _driverAccepted) return;
+      _driverAccepted = true;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => ActiveRideScreen(rideData: driverData)),
+      );
+    };
+
+    // Fallback safety timeout if no live driver answers in 15 seconds
+    Future.delayed(const Duration(seconds: 15), () {
+      if (mounted && !_driverAccepted) {
+        _driverAccepted = true;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const ActiveRideScreen()),
+          MaterialPageRoute(builder: (_) => ActiveRideScreen(rideData: {
+            ...payload,
+            'driverName': 'Ali Ahmed (Yalla VIP)',
+            'carModel': 'Toyota Camry (White)',
+            'plate': 'Baghdad 84920',
+            'rating': 4.9,
+          })),
         );
       }
     });

@@ -19,9 +19,11 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
   String? selectedGov;
   final List<String> governorates = ['Kirkuk', 'Bagdad', 'Erbil', 'Basra', 'Najaf', 'Karbala', 'Mosul'];
   final TextEditingController _regionCtrl = TextEditingController();
-  // Sender phone — fetched from user profile, but can be overridden
   final TextEditingController _senderPhoneCtrl = TextEditingController(text: '');
   bool _editingSenderPhone = false;
+  String _selectedLocationName = 'Choose your location';
+  double? _selectedLat;
+  double? _selectedLng;
 
   @override
   void dispose() {
@@ -188,8 +190,18 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
 
                       // Location Picker
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const MapSelectionScreen()));
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MapSelectionScreen()),
+                          );
+                          if (result != null && result is Map) {
+                            setState(() {
+                              _selectedLocationName = result['name'] ?? result['address'] ?? 'Selected Location';
+                              _selectedLat = result['lat'] as double?;
+                              _selectedLng = result['lng'] as double?;
+                            });
+                          }
                         },
                         child: Container(
                           height: 60,
@@ -200,14 +212,23 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
                             border: Border.all(color: Colors.black12),
                             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Choose your location',
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                              Expanded(
+                                child: Text(
+                                  _selectedLocationName,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                    color: _selectedLat != null ? Colors.black87 : Colors.black54,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              Icon(Icons.location_on, color: Colors.black, size: 28),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.location_on, color: Colors.black, size: 28),
                             ],
                           ),
                         ),

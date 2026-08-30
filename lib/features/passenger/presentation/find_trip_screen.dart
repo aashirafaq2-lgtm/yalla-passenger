@@ -22,6 +22,9 @@ class _FindTripScreenState extends State<FindTripScreen> {
   bool isLoading = true;
   final TextEditingController _discountCtrl = TextEditingController();
   bool _hasDiscountCode = false;
+  String _selectedLocationName = 'Choose Your location';
+  double? _selectedLat;
+  double? _selectedLng;
 
   @override
   void initState() {
@@ -157,10 +160,20 @@ class _FindTripScreenState extends State<FindTripScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Choose your location (added per Figure 1)
+                      // Choose your location (per Figure 1)
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const MapSelectionScreen()));
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MapSelectionScreen()),
+                          );
+                          if (result != null && result is Map) {
+                            setState(() {
+                              _selectedLocationName = result['name'] ?? result['address'] ?? 'Selected Location';
+                              _selectedLat = result['lat'] as double?;
+                              _selectedLng = result['lng'] as double?;
+                            });
+                          }
                         },
                         child: Container(
                           height: 55,
@@ -171,11 +184,23 @@ class _FindTripScreenState extends State<FindTripScreen> {
                             border: Border.all(color: Colors.black12),
                             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8)],
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Choose your location', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                              Icon(Icons.location_on, color: Colors.black),
+                              Expanded(
+                                child: Text(
+                                  _selectedLocationName,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: _selectedLat != null ? Colors.black87 : Colors.black54,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.location_on, color: Colors.black),
                             ],
                           ),
                         ),

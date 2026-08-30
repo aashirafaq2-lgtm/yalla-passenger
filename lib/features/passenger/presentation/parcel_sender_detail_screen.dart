@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../../core/theme/app_colors.dart';
 import 'parcel_summary_screen.dart';
+import 'map_selection_screen.dart';
 
 class ParcelSenderDetailScreen extends StatefulWidget {
   const ParcelSenderDetailScreen({super.key});
@@ -23,6 +24,11 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
   // Sender phone — change option
   final TextEditingController _senderPhoneCtrl = TextEditingController(text: '');
   bool _editingSenderPhone = false;
+
+  // Location selector
+  String _selectedLocationName = 'Choose your location';
+  double? _selectedLat;
+  double? _selectedLng;
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -144,10 +150,57 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                           governorates, (val) => setState(() => selectedSendingGov = val!)),
                       const SizedBox(height: 15),
                       _buildTextField('Choose sending region'),
+                      const SizedBox(height: 15),
+
+                      // Location Picker (per Sending mail 2 requirement)
+                      GestureDetector(
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MapSelectionScreen()),
+                          );
+                          if (result != null && result is Map) {
+                            setState(() {
+                              _selectedLocationName = result['name'] ?? result['address'] ?? 'Selected Location';
+                              _selectedLat = result['lat'] as double?;
+                              _selectedLng = result['lng'] as double?;
+                            });
+                          }
+                        },
+                        child: Container(
+                          height: 60,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: Colors.black12),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _selectedLocationName,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                    color: _selectedLat != null ? Colors.black87 : Colors.black54,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.location_on, color: Colors.black, size: 28),
+                            ],
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 25),
 
-                      // Sender phone change — "Sending mail 2" feature
-                      const Text('Sender Phone',
+                      // Sender Information & Change Option
+                      const Text('Sender Information',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                       const SizedBox(height: 10),
                       Container(

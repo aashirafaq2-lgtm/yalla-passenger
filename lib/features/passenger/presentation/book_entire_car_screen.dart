@@ -300,16 +300,17 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.primaryOrange.withOpacity(0.7),
+          color: AppColors.primaryOrange,
           borderRadius: BorderRadius.circular(15),
-          boxShadow: [BoxShadow(color: AppColors.primaryOrange.withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: AppColors.primaryOrange.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3))],
         ),
         child: Column(
           children: [
-            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 2),
+            Text(value, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -318,22 +319,23 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
 
   Widget _buildCityBadge(String value, List<String> items, ValueChanged<String?> onChanged) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.primaryOrange.withOpacity(0.7),
+        color: AppColors.primaryOrange,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: AppColors.primaryOrange.withOpacity(0.25), blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 16),
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18),
           dropdownColor: AppColors.primaryOrange,
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
           onChanged: onChanged,
           items: items.map<DropdownMenuItem<String>>((String item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(item, style: const TextStyle(fontSize: 16)),
+              child: Text(item, style: const TextStyle(fontSize: 16, color: Colors.white)),
             );
           }).toList(),
         ),
@@ -355,15 +357,16 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 45,
+        height: 48,
         decoration: BoxDecoration(
-          color: AppColors.primaryOrange.withOpacity(0.6),
-          borderRadius: BorderRadius.circular(10),
+          color: AppColors.primaryOrange,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: AppColors.primaryOrange.withOpacity(0.25), blurRadius: 6, offset: const Offset(0, 2))],
         ),
         child: Center(
           child: Text(
             label,
-            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
           ),
         ),
       ),
@@ -373,9 +376,9 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
   Widget _buildInfoItem(IconData icon, String value, String label) {
     return Column(
       children: [
-        Icon(icon, size: 28, color: Colors.black),
+        Icon(icon, size: 28, color: Colors.black87),
         const SizedBox(height: 6),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
       ],
     );
   }
@@ -384,9 +387,12 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
     return Column(
       crossAxisAlignment: isRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        if (icon != null) Icon(icon, size: 22, color: Colors.black),
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        if (icon != null) ...[
+          Icon(icon, size: 22, color: Colors.black87),
+          const SizedBox(height: 2),
+        ],
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black54)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black87)),
       ],
     );
   }

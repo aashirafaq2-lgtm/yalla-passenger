@@ -145,7 +145,13 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
             mapController: _mapController,
             options: MapOptions(initialCenter: _driverPos, initialZoom: 14.5),
             children: [
-              TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.yalla.passenger',
+                maxZoom: 19,
+              ),
+
+
               PolylineLayer(
                 polylines: [
                   Polyline(points: [LatLng(pickupLat, pickupLng), _driverPos, LatLng(dropLat, dropLng)], color: AppColors.primaryOrange, strokeWidth: 4),

@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 class ApiService {
   final Dio dio = Dio(
     BaseOptions(
-      baseUrl: 'http://76.13.3.121:4000/api',
+      baseUrl: 'http://72.62.50.86/api',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {
@@ -68,4 +68,39 @@ class ApiService {
   Future<Response> getGovernorates() async {
     return await dio.get('/trips/governorates');
   }
+
+  // Map & Spatial APIs
+  Future<Response> searchLocation(String query, {double? lat, double? lng}) async {
+    return await dio.get('/map/search', queryParameters: {
+      'q': query,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+    });
+  }
+
+  Future<Response> reverseGeocode(double lat, double lng) async {
+    return await dio.get('/map/reverse-geocode', queryParameters: {
+      'lat': lat,
+      'lng': lng,
+    });
+  }
+
+  Future<Response> getDirections({
+    required double pickupLat,
+    required double pickupLng,
+    required double dropLat,
+    required double dropLng,
+  }) async {
+    return await dio.get('/map/route', queryParameters: {
+      'pickupLat': pickupLat,
+      'pickupLng': pickupLng,
+      'dropLat': dropLat,
+      'dropLng': dropLng,
+    });
+  }
+
+  Future<Response> getMapConfig() async {
+    return await dio.get('/map/config');
+  }
 }
+
