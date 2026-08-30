@@ -19,12 +19,9 @@ workflows:
       - name: Set up Code Signing
         script: |
           xcode-project use-profiles
-      - name: Build and Sign IPA
+      - name: Build Flutter IPA
         script: |
-          xcode-project build-ipa \
-            --workspace "ios/Runner.xcworkspace" \
-            --scheme "Runner" \
-            --config "Release"
+          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     publishing:
       app_store_connect:
         auth: integration
