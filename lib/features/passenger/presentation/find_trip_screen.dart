@@ -66,7 +66,9 @@ class _FindTripScreenState extends State<FindTripScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -219,6 +221,8 @@ class _FindTripScreenState extends State<FindTripScreen> {
                               ),
                               child: TextField(
                                 controller: _discountCtrl,
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) => FocusScope.of(context).unfocus(),
                                 decoration: const InputDecoration(
                                   hintText: 'Discount code',
                                   border: InputBorder.none,
@@ -241,6 +245,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
                               onPressed: () {
+                                FocusScope.of(context).unfocus();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Invalid discount code')),
                                 );
@@ -250,6 +255,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                           ),
                         ],
                       ),
+
                     ],
                   ),
                 ),
@@ -333,6 +339,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 

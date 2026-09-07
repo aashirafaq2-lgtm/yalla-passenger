@@ -42,5 +42,6 @@ ios/*.xcodeproj/xcuserdata/
 # Temp files
 *.txt
 *.png
+!assets/**
 *.lml
 __pycache__/

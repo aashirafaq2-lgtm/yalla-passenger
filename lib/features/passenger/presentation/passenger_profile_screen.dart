@@ -152,12 +152,18 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                             _buildFormattedMenuItem(Icons.support_agent_outlined, 'Support', () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen()));
                             }),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 10),
                             _buildFormattedMenuItem(Icons.logout, 'Sign Out', () async {
                               final storage = Provider.of<StorageService>(context, listen: false);
                               await storage.clear();
                               if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/signin', (_) => false);
-                            }, isDestructive: true),
+                            }),
+                            _buildFormattedMenuItem(
+                              Icons.delete_forever_rounded, 
+                              'Delete Account', 
+                              () => _showDeleteAccountDialog(context),
+                              isDestructive: true,
+                            ),
                           ],
                         ),
                       ),
@@ -168,6 +174,80 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                 ),
               ),
           ),
+    );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Text('Delete Account', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to permanently delete your account?\n\n'
+          '• Your personal profile and booking history will be permanently deleted.\n'
+          '• Your wallet balance and records will be removed.\n'
+          '• This action is immediate and cannot be undone.',
+          style: TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => const Center(child: CircularProgressIndicator(color: Colors.red)),
+              );
+
+              try {
+                final api = Provider.of<ApiService>(context, listen: false);
+                final storage = Provider.of<StorageService>(context, listen: false);
+                final token = await storage.getToken();
+                if (token != null) {
+                  await api.deleteAccount(token);
+                }
+                await storage.clear();
+                if (context.mounted) {
+                  Navigator.pop(context); // dismiss loading
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Your account has been deleted successfully.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  Navigator.of(context).pushNamedAndRemoveUntil('/signin', (_) => false);
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context); // dismiss loading
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to delete account. Please try again or contact support.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete Permanently', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -187,17 +267,28 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.black12),
+        color: isDestructive ? const Color(0xFFFFF5F5) : Colors.white,
+        border: Border.all(
+          color: isDestructive ? Colors.red.withOpacity(0.35) : Colors.black12,
+          width: isDestructive ? 1.5 : 1.0,
+        ),
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))
         ],
       ),
       child: ListTile(
-        leading: Icon(icon, color: Colors.black, size: 22),
-        title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.black),
+        leading: Icon(icon, color: isDestructive ? Colors.red : Colors.black, size: 22),
+        title: Text(
+          title, 
+          style: TextStyle(
+            fontSize: 14, 
+            fontWeight: FontWeight.w600, 
+            color: isDestructive ? Colors.red : Colors.black,
+          ),
+        ),
+        subtitle: isDestructive ? const Text('Permanently delete account', style: TextStyle(color: Colors.redAccent, fontSize: 11)) : null,
+        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: isDestructive ? Colors.red : Colors.black),
         onTap: onTap,
       ),
     );
