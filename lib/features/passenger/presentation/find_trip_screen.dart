@@ -276,19 +276,45 @@ class _FindTripScreenState extends State<FindTripScreen> {
                       BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10),
                     ],
                   ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Price details',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildPriceRow('1x seat', '75,000 IQD'),
-                      const SizedBox(height: 12),
-                      _buildPriceRow('Front seat', frontSeat ? '5,000 IQD' : 'No'),
-                      const Divider(height: 32),
-                      _buildPriceRow('Total', '25,250 IQD', isTotal: true),
-                    ],
+                  child: Builder(
+                    builder: (context) {
+                      const int seatPrice = 20000;
+                      final int frontSeatPrice = frontSeat ? 5250 : 0;
+                      final int totalSeatsPrice = seats * seatPrice;
+                      final int grandTotal = totalSeatsPrice + frontSeatPrice;
+
+                      String formatIqd(int amount) {
+                        return amount.toString().replaceAllMapped(
+                          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                          (Match m) => '${m[1]},',
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          const Text(
+                            'Price details',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildPriceRow(
+                            '${seats}x seat',
+                            '${formatIqd(totalSeatsPrice)} IQD',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildPriceRow(
+                            'Front seat',
+                            frontSeat ? '${formatIqd(frontSeatPrice)} IQD' : 'No',
+                          ),
+                          const Divider(height: 32),
+                          _buildPriceRow(
+                            'Total',
+                            '${formatIqd(grandTotal)} IQD',
+                            isTotal: true,
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -317,6 +343,9 @@ class _FindTripScreenState extends State<FindTripScreen> {
                           'type': 'SCHEDULED_SEAT',
                           'tripId': 'mock_trip_id',
                           'seatsBooked': seats,
+                          'frontSeat': frontSeat,
+                          if (_selectedLat != null) 'pickupLat': _selectedLat,
+                          if (_selectedLng != null) 'pickupLng': _selectedLng,
                         });
                         if (response.statusCode == 200) {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const WaitScreen()));

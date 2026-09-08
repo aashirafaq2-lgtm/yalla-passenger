@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import 'map_selection_screen.dart';
 import 'trip_information_screen.dart';
 
 class ScheduleTripConfigScreen extends StatefulWidget {
-  const ScheduleTripConfigScreen({super.key});
+  final String initialOrigin;
+  final String initialDestination;
+  final bool isStaticCity;
+
+  const ScheduleTripConfigScreen({
+    super.key,
+    this.initialOrigin = 'Kirkuk',
+    this.initialDestination = 'Bagdad',
+    this.isStaticCity = true,
+  });
 
   @override
   State<ScheduleTripConfigScreen> createState() => _ScheduleTripConfigScreenState();
@@ -15,8 +23,8 @@ class ScheduleTripConfigScreen extends StatefulWidget {
 class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
   int seats = 1;
   bool frontSeat = false;
-  String selectedOrigin = 'Kirkuk';
-  String selectedDestination = 'Bagdad';
+  late String selectedOrigin;
+  late String selectedDestination;
   final List<String> cities = ['Kirkuk', 'Bagdad', 'Erbil', 'Basra', 'Najaf', 'Karbala', 'Mosul'];
   final TextEditingController _discountCtrl = TextEditingController();
   bool _hasDiscountCode = false;
@@ -24,6 +32,8 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
   @override
   void initState() {
     super.initState();
+    selectedOrigin = widget.initialOrigin;
+    selectedDestination = widget.initialDestination;
     _discountCtrl.addListener(() {
       setState(() => _hasDiscountCode = _discountCtrl.text.trim().isNotEmpty);
     });
@@ -272,6 +282,19 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
   }
 
   Widget _buildCityBadge(String value, ValueChanged<String?> onChanged) {
+    if (widget.isStaticCity) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.primaryOrange,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          value,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(

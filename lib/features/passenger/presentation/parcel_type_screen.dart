@@ -6,6 +6,9 @@ import '../../../core/network/api_service.dart';
 import 'parcel_sender_detail_screen.dart';
 import 'map_selection_screen.dart';
 
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
+
 class ParcelTypeScreen extends StatefulWidget {
   const ParcelTypeScreen({super.key});
 
@@ -15,9 +18,9 @@ class ParcelTypeScreen extends StatefulWidget {
 
 class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
   bool isMail = true;
-  String? paymentMethod = 'sender';
   String? selectedGov;
   final List<String> governorates = ['Kirkuk', 'Bagdad', 'Erbil', 'Basra', 'Najaf', 'Karbala', 'Mosul'];
+  final TextEditingController _mailTypeCtrl = TextEditingController();
   final TextEditingController _regionCtrl = TextEditingController();
   final TextEditingController _senderPhoneCtrl = TextEditingController(text: '');
   bool _editingSenderPhone = false;
@@ -25,11 +28,45 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
   double? _selectedLat;
   double? _selectedLng;
 
+  Uint8List? _parcelImageBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _mailTypeCtrl.addListener(() => setState(() {}));
+    _regionCtrl.addListener(() => setState(() {}));
+    _senderPhoneCtrl.addListener(() => setState(() {}));
+  }
+
   @override
   void dispose() {
+    _mailTypeCtrl.dispose();
     _regionCtrl.dispose();
     _senderPhoneCtrl.dispose();
     super.dispose();
+  }
+
+  bool get _isFormValid {
+    return _mailTypeCtrl.text.trim().isNotEmpty &&
+        selectedGov != null &&
+        _regionCtrl.text.trim().isNotEmpty &&
+        _selectedLat != null;
+  }
+
+  Future<void> _pickParcelPhoto() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+      if (result != null && result.files.single.bytes != null) {
+        setState(() {
+          _parcelImageBytes = result.files.single.bytes;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
   }
 
   @override
@@ -76,7 +113,7 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
                   Expanded(
                     child: FadeInLeft(
                       child: _buildTypeCard(
-                        label: 'Mail',
+                        label: 'Send documents',
                         icon: Icons.mail_outline,
                         isSelected: isMail,
                         onTap: () => setState(() => isMail = true),
@@ -113,7 +150,7 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Sender Phone section — "Sending mail 1" change
+                      // Sender Phone section
                       const Text(
                         'Sender Information',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -181,11 +218,11 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 15),
-                      _buildTextField(isMail ? 'Write mail type (e.g. Book, Document)' : 'Describe your parcel'),
+                      _buildTextField(isMail ? 'Write document type (e.g. Book, Document)' : 'Describe your parcel', _mailTypeCtrl),
                       const SizedBox(height: 15),
                       _buildDropdown('Choose the receiving governorate', selectedGov, governorates, (val) => setState(() => selectedGov = val!)),
                       const SizedBox(height: 15),
-                      _buildTextField('Choose region'),
+                      _buildTextField('Choose region', _regionCtrl),
                       const SizedBox(height: 15),
 
                       // Location Picker
@@ -233,15 +270,63 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 20),
 
+                      // Photo for the mail or parcel
+                      Text(
+                        isMail ? 'Photo for the documents' : 'Photo for the parcel',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: _pickParcelPhoto,
+                        child: Container(
+                          width: double.infinity,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _parcelImageBytes != null ? const Color(0xFF65CA28) : AppColors.primaryOrange.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: _parcelImageBytes != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(15),
+                                  child: Image.memory(_parcelImageBytes!, fit: BoxFit.cover),
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.camera_alt_outlined, size: 36, color: AppColors.primaryOrange.withOpacity(0.7)),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      isMail ? 'Upload documents photo' : 'Upload parcel photo',
+                                      style: const TextStyle(color: Colors.black54, fontSize: 14, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Payment method (Only sender pay - fixed)
                       const Text(
-                        'Payment methods',
+                        'Payment method',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 10),
-                      _buildRadioTile('Sender (upon receipt)', 'sender'),
-                      _buildRadioTile('Receiving (upon receipt)', 'receiver'),
+                      Row(
+                        children: [
+                          Icon(Icons.radio_button_checked, color: AppColors.primaryOrange, size: 22),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Sender (upon receipt)',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -249,7 +334,7 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
 
               const SizedBox(height: 40),
 
-              // Next Button — no Pulse per design notes
+              // Next Button — Active only when form is valid
               FadeInUp(
                 delay: const Duration(milliseconds: 400),
                 child: SizedBox(
@@ -257,35 +342,43 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
                   height: 65,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      elevation: 8,
-                      shadowColor: Colors.black26,
-                      side: const BorderSide(color: Colors.black12),
+                      backgroundColor: _isFormValid ? AppColors.primaryOrange : Colors.grey.shade300,
+                      foregroundColor: _isFormValid ? Colors.white : Colors.black38,
+                      elevation: _isFormValid ? 8 : 0,
+                      shadowColor: _isFormValid ? AppColors.primaryOrange.withOpacity(0.4) : Colors.transparent,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
                     ),
-                    onPressed: () async {
-                      try {
-                        final apiService = Provider.of<ApiService>(context, listen: false);
-                        final response = await apiService.dio.post('/parcels/request', data: {
-                          'recipientPhone': '07701234567',
-                          'recipientName': 'Hassan',
-                          'parcelType': isMail ? 'MAIL' : 'PARCEL',
-                          'weight': 2.5,
-                          'pickupLat': 33.3,
-                          'pickupLng': 44.4,
-                          'pickupRegion': 'Mansour',
-                          'dropRegion': 'Karrada',
-                          'paymentState': paymentMethod == 'sender' ? 'SENDER_PAYS' : 'RECIPIENT_PAYS',
-                          'senderPhone': _senderPhoneCtrl.text,
-                        });
-                        if (response.statusCode == 200) {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ParcelSenderDetailScreen()));
-                        }
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                      }
-                    },
+                    onPressed: !_isFormValid
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please fill all required recipient and location information.'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        : () async {
+                            try {
+                              final apiService = Provider.of<ApiService>(context, listen: false);
+                              final response = await apiService.dio.post('/parcels/request', data: {
+                                'recipientPhone': '07701234567',
+                                'recipientName': 'Hassan',
+                                'parcelType': isMail ? 'MAIL' : 'PARCEL',
+                                'weight': 2.5,
+                                'pickupLat': _selectedLat ?? 33.3,
+                                'pickupLng': _selectedLng ?? 44.4,
+                                'pickupRegion': _regionCtrl.text,
+                                'dropRegion': selectedGov ?? 'Bagdad',
+                                'paymentState': 'SENDER_PAYS',
+                                'senderPhone': _senderPhoneCtrl.text,
+                              });
+                              if (response.statusCode == 200) {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const ParcelSenderDetailScreen()));
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                            }
+                          },
                     child: const Text('Next', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                   ),
                 ),
@@ -321,8 +414,9 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
             const SizedBox(height: 10),
             Text(
               label,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 16,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 color: isSelected ? Colors.black : Colors.black45,
               ),
@@ -333,7 +427,7 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
     );
   }
 
-  Widget _buildTextField(String hint) {
+  Widget _buildTextField(String hint, TextEditingController controller) {
     return Container(
       height: 55,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -343,6 +437,7 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
         border: Border.all(color: Colors.black12),
       ),
       child: TextField(
+        controller: controller,
         decoration: InputDecoration(
           hintText: hint,
           border: InputBorder.none,
@@ -378,17 +473,6 @@ class _ParcelTypeScreenState extends State<ParcelTypeScreen> {
           }).toList(),
         ),
       ),
-    );
-  }
-
-  Widget _buildRadioTile(String label, String value) {
-    return RadioListTile<String>(
-      title: Text(label, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-      value: value,
-      groupValue: paymentMethod,
-      onChanged: (val) => setState(() => paymentMethod = val),
-      activeColor: AppColors.primaryOrange,
-      contentPadding: EdgeInsets.zero,
     );
   }
 }

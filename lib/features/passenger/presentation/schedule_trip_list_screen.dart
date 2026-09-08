@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import 'schedule_trip_config_screen.dart';
 
@@ -15,6 +14,14 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
   String filterOrigin = 'Kirkuk';
   String filterDest = 'Bagdad';
   final List<String> cities = ['Kirkuk', 'Bagdad', 'Erbil', 'Basra', 'Najaf', 'Karbala', 'Mosul'];
+  bool _isSearching = false;
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,20 +47,46 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Center(
-                        child: Text(
-                          'Schedule a trip',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
+                        child: _isSearching
+                            ? TextField(
+                                controller: _searchCtrl,
+                                autofocus: true,
+                                decoration: const InputDecoration(
+                                  hintText: 'Search trips...',
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                                ),
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                onChanged: (val) => setState(() {}),
+                              )
+                            : const Text(
+                                'Schedule a trip',
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                              ),
                       ),
                     ),
-                    const SizedBox(width: 48),
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.black12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.black),
+                        onPressed: () {
+                          setState(() {
+                            _isSearching = !_isSearching;
+                            if (!_isSearching) _searchCtrl.clear();
+                          });
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
 
             // Trip List
             Expanded(
@@ -179,7 +212,13 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const ScheduleTripConfigScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => ScheduleTripConfigScreen(
+                        initialOrigin: from,
+                        initialDestination: to,
+                        isStaticCity: true,
+                      ),
+                    ),
                   );
                 },
                 child: const Text('Book now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
