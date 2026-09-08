@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Yalla requires camera access to allow you to take photos of documents and parcels for delivery requests.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Yalla requires photo library access to upload photos of documents and parcels from your gallery.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Yalla uses your location to find nearby drivers and set pickup locations.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
