@@ -68,7 +68,7 @@ class ParcelSummaryScreen extends StatelessWidget {
               _buildSummaryCard(
                 title: 'Sender',
                 details: {
-                  'Name': 'Yasser',
+                  'Name': 'Sender',
                   'Phone number': '0770-123-1234',
                   'governorate': 'Kirkuk',
                   'Region': 'Baghdad road',

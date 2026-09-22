@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'payment_method_screen.dart';
 import 'language_screen.dart';
 import 'support_screen.dart';
@@ -51,8 +52,28 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final firstName = _user?['firstName'] ?? 'Yasser!';
-    final walletBalance = _wallet?['balance'] != null ? '${_wallet!['balance']}' : '10';
+    final localeProvider = Provider.of<LocaleProvider>(context);
+
+    // Compute dynamic user name from database profile
+    String displayName = '';
+    if (_user != null) {
+      final first = (_user['firstName'] ?? '').toString().trim();
+      final last = (_user['lastName'] ?? '').toString().trim();
+      if (first.isNotEmpty || last.isNotEmpty) {
+        displayName = '$first $last'.trim();
+      } else if (_user['phone'] != null && _user['phone'].toString().isNotEmpty) {
+        displayName = _user['phone'].toString();
+      }
+    }
+    if (displayName.isEmpty) {
+      displayName = localeProvider.tr('passenger');
+    }
+
+    final totalTrips = _user?['totalRides'] != null ? '${_user!['totalRides']}' : '0';
+    final activeHours = _user?['activeHours'] != null ? '${_user!['activeHours']}' : '1';
+    final walletBalance = _wallet?['balance'] != null 
+        ? '${_wallet!['balance']} IQD' 
+        : (_user?['wallet']?['balance'] != null ? '${_user!['wallet']['balance']} IQD' : '0 IQD');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -67,9 +88,10 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                   child: Column(
                     children: [
                       const SizedBox(height: 10),
-                      const Center(
-                        child: Text('Profile', 
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87)
+                      Center(
+                        child: Text(
+                          localeProvider.tr('profile'), 
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black87)
                         ),
                       ),
                       const SizedBox(height: 40),
@@ -91,24 +113,31 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                                 ],
                               ),
                               child: const CircleAvatar(
-                                radius: 55,
+                                radius: 45,
                                 backgroundColor: Color(0xFFF8F8F8),
-                                child: Icon(Icons.person, size: 60, color: Colors.black),
+                                child: Icon(Icons.person, size: 50, color: AppColors.primaryOrange),
                               ),
                             ),
                             const Spacer(),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                const Text('Welcome', style: TextStyle(fontSize: 22, color: Colors.black54, fontWeight: FontWeight.w500)),
-                                Text('$firstName', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.black)),
+                                Text(
+                                  localeProvider.tr('welcome'), 
+                                  style: const TextStyle(fontSize: 20, color: Colors.black54, fontWeight: FontWeight.w500)
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  displayName, 
+                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black)
+                                ),
                               ],
                             ),
                           ],
                         ),
                       ),
             
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 35),
             
                       // ── Stats Card ───────────────────────────────────────────
                       FadeInUp(
@@ -119,48 +148,48 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(15),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))
+                              BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 8))
                             ],
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              _buildStatItem(Icons.timer_outlined, '10', 'Hours'),
-                              _buildStatItem(Icons.directions_car_outlined, '10', 'Trips'),
-                              _buildStatItem(Icons.wallet_outlined, walletBalance, 'Wallet'),
+                              _buildStatItem(Icons.timer_outlined, activeHours, localeProvider.tr('hours')),
+                              _buildStatItem(Icons.directions_car_outlined, totalTrips, localeProvider.tr('trips')),
+                              _buildStatItem(Icons.wallet_outlined, walletBalance, localeProvider.tr('wallet')),
                             ],
                           ),
                         ),
                       ),
             
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 35),
             
                       // ── Menu Items ───────────────────────────────────────────
                       FadeInUp(
                         delay: const Duration(milliseconds: 200),
                         child: Column(
                           children: [
-                            _buildFormattedMenuItem(Icons.credit_card, 'Payment method', () {
+                            _buildFormattedMenuItem(Icons.credit_card, localeProvider.tr('payment_method'), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentMethodScreen()));
                             }),
-                            _buildFormattedMenuItem(Icons.map_outlined, 'Trips', () {
+                            _buildFormattedMenuItem(Icons.map_outlined, localeProvider.tr('trips'), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const PassengerTripsScreen()));
                             }),
-                            _buildFormattedMenuItem(Icons.language, 'Language', () {
+                            _buildFormattedMenuItem(Icons.language, localeProvider.tr('language'), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const LanguageScreen()));
                             }),
-                            _buildFormattedMenuItem(Icons.support_agent_outlined, 'Support', () {
+                            _buildFormattedMenuItem(Icons.support_agent_outlined, localeProvider.tr('support'), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen()));
                             }),
                             const SizedBox(height: 10),
-                            _buildFormattedMenuItem(Icons.logout, 'Sign Out', () async {
+                            _buildFormattedMenuItem(Icons.logout, localeProvider.tr('sign_out'), () async {
                               final storage = Provider.of<StorageService>(context, listen: false);
                               await storage.clear();
                               if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/signin', (_) => false);
                             }),
                             _buildFormattedMenuItem(
                               Icons.delete_forever_rounded, 
-                              'Delete Account', 
+                              localeProvider.tr('delete_account'), 
                               () => _showDeleteAccountDialog(context),
                               isDestructive: true,
                             ),
@@ -178,28 +207,31 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
   }
 
   void _showDeleteAccountDialog(BuildContext context) {
+    final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 8),
-            Text('Delete Account', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            const SizedBox(width: 8),
+            Text(localeProvider.tr('delete_account'), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
           ],
         ),
-        content: const Text(
-          'Are you sure you want to permanently delete your account?\n\n'
-          '• Your personal profile and booking history will be permanently deleted.\n'
-          '• Your wallet balance and records will be removed.\n'
-          '• This action is immediate and cannot be undone.',
-          style: TextStyle(fontSize: 14, height: 1.4),
+        content: Text(
+          localeProvider.isArabic
+            ? 'هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟\n\n• سيتم مسح بياناتك الشخصية وسجل الرحلات.\n• سيتم إلغاء رصيد المحفظة.\n• هذا الإجراء فوري ولا يمكن التراجع عنه.'
+            : 'Are you sure you want to permanently delete your account?\n\n'
+              '• Your personal profile and booking history will be permanently deleted.\n'
+              '• Your wallet balance and records will be removed.\n'
+              '• This action is immediate and cannot be undone.',
+          style: const TextStyle(fontSize: 14, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
+            child: Text(localeProvider.tr('cancel'), style: const TextStyle(color: Colors.black54)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -225,8 +257,8 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                 if (context.mounted) {
                   Navigator.pop(context); // dismiss loading
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Your account has been deleted successfully.'),
+                    SnackBar(
+                      content: Text(localeProvider.isArabic ? 'تم حذف حسابك بنجاح.' : 'Your account has been deleted successfully.'),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -236,15 +268,15 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                 if (context.mounted) {
                   Navigator.pop(context); // dismiss loading
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to delete account. Please try again or contact support.'),
+                    SnackBar(
+                      content: Text(localeProvider.isArabic ? 'فشل حذف الحساب. حاول مرة أخرى.' : 'Failed to delete account. Please try again.'),
                       backgroundColor: Colors.red,
                     ),
                   );
                 }
               }
             },
-            child: const Text('Delete Permanently', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(localeProvider.tr('delete_permanently'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -256,7 +288,7 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
       children: [
         Icon(icon, color: Colors.black, size: 24),
         const SizedBox(height: 8),
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
@@ -287,84 +319,15 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
             color: isDestructive ? Colors.red : Colors.black,
           ),
         ),
-        subtitle: isDestructive ? const Text('Permanently delete account', style: TextStyle(color: Colors.redAccent, fontSize: 11)) : null,
+        subtitle: isDestructive 
+          ? Text(
+              Provider.of<LocaleProvider>(context).isArabic ? 'حذف الحساب نهائياً' : 'Permanently delete account',
+              style: const TextStyle(color: Colors.redAccent, fontSize: 11)
+            ) 
+          : null,
         trailing: Icon(Icons.arrow_forward_ios, size: 16, color: isDestructive ? Colors.red : Colors.black),
         onTap: onTap,
       ),
-    );
-  }
-
-  Widget _buildStatCard(IconData icon, String label, String value) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.black.withOpacity(0.06)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)],
-        ),
-        child: Column(children: [
-          Icon(icon, color: AppColors.primaryOrange, size: 22),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
-          Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 10)),
-        ]),
-      ),
-    );
-  }
-
-  Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 3))],
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isDestructive ? Colors.red.withOpacity(0.08) : AppColors.primaryOrange.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: isDestructive ? Colors.red : AppColors.primaryOrange, size: 20),
-        ),
-        title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: isDestructive ? Colors.red : Colors.black87)),
-        trailing: Icon(Icons.arrow_forward_ios, size: 13, color: isDestructive ? Colors.red.withOpacity(0.4) : Colors.black26),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  Widget _buildTxTile(dynamic tx) {
-    final amount = tx['amount'] != null ? '${tx['amount']} IQD' : '--';
-    final type   = tx['type'] ?? 'DEBIT';
-    final isCredit = type == 'CREDIT';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-      ),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isCredit ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-              color: isCredit ? Colors.green : Colors.red, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Text(tx['description'] ?? type, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
-        Text(amount, style: TextStyle(fontWeight: FontWeight.bold, color: isCredit ? Colors.green : Colors.red)),
-      ]),
     );
   }
 }

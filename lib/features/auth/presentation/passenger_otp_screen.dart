@@ -14,7 +14,7 @@ class PassengerOtpScreen extends StatefulWidget {
 }
 
 class _PassengerOtpScreenState extends State<PassengerOtpScreen> {
-  final List<TextEditingController> _controllers = List.generate(4, (_) => TextEditingController());
+  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
   
   String get _otp => _controllers.map((c) => c.text).join();
 
@@ -72,7 +72,7 @@ class _PassengerOtpScreenState extends State<PassengerOtpScreen> {
                   // OTP Boxes
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: List.generate(4, (index) => _buildOtpBox(index)),
+                    children: List.generate(6, (index) => _buildOtpBox(index)),
                   ),
                   const Spacer(),
                 ],
@@ -120,8 +120,8 @@ class _PassengerOtpScreenState extends State<PassengerOtpScreen> {
 
   Widget _buildOtpBox(int index) {
     return Container(
-      width: 60,
-      height: 60,
+      width: 48,
+      height: 55,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -140,7 +140,7 @@ class _PassengerOtpScreenState extends State<PassengerOtpScreen> {
         keyboardType: TextInputType.number,
         maxLength: 1,
         onChanged: (value) {
-          if (value.isNotEmpty && index < 3) {
+          if (value.isNotEmpty && index < 5) {
             FocusScope.of(context).nextFocus();
           }
         },

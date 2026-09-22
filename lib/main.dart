@@ -34,7 +34,7 @@ void main() async {
       providers: [
         Provider.value(value: apiService),
         Provider.value(value: storageService),
-        ChangeNotifierProvider(create: (_) => AuthProvider(authRepository)),
+        ChangeNotifierProvider(create: (_) => AuthProvider(authRepository, apiService)),
         Provider(create: (_) => SocketService(storageService)),
         Provider.value(value: notificationService),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),

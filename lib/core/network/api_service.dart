@@ -46,6 +46,10 @@ class ApiService {
     return await dio.delete('/user/profile', options: Options(headers: {'Authorization': 'Bearer $token'}));
   }
 
+  Future<Response> updateProfile(Map<String, dynamic> data, String token) async {
+    return await dio.patch('/user/profile', data: data, options: Options(headers: {'Authorization': 'Bearer $token'}));
+  }
+
   Future<Response> updateFcmToken(String fcmToken, String token) async {
     return await dio.patch('/user/fcm-token', data: {'fcmToken': fcmToken}, options: Options(headers: {'Authorization': 'Bearer $token'}));
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'passenger_home_screen.dart';
 import 'passenger_trips_screen.dart';
 import 'passenger_profile_screen.dart';
@@ -49,33 +51,38 @@ class _PassengerMainScreenState extends State<PassengerMainScreen> {
             top: false,
             child: SizedBox(
               height: 64,
-              child: Row(
-                children: [
-                  _DarkNavItem(
-                    icon: Icons.home_rounded,
-                    outlineIcon: Icons.home_outlined,
-                    label: 'Home',
-                    selected: _selectedIndex == 0,
-                    isFirst: true,
-                    onTap: () => _onNavTap(0),
-                  ),
-                  _DarkNavItem(
-                    icon: Icons.directions_car_filled_rounded,
-                    outlineIcon: Icons.directions_car_outlined,
-                    label: 'My trips',
-                    selected: _selectedIndex == 1,
-                    isFirst: false,
-                    onTap: () => _onNavTap(1),
-                  ),
-                  _DarkNavItem(
-                    icon: Icons.person_rounded,
-                    outlineIcon: Icons.person_outline_rounded,
-                    label: 'Profile',
-                    selected: _selectedIndex == 2,
-                    isFirst: false,
-                    onTap: () => _onNavTap(2),
-                  ),
-                ],
+              child: Builder(
+                builder: (context) {
+                  final localeProvider = Provider.of<LocaleProvider>(context);
+                  return Row(
+                    children: [
+                      _DarkNavItem(
+                        icon: Icons.home_rounded,
+                        outlineIcon: Icons.home_outlined,
+                        label: localeProvider.tr('home'),
+                        selected: _selectedIndex == 0,
+                        isFirst: true,
+                        onTap: () => _onNavTap(0),
+                      ),
+                      _DarkNavItem(
+                        icon: Icons.directions_car_filled_rounded,
+                        outlineIcon: Icons.directions_car_outlined,
+                        label: localeProvider.tr('my_trips'),
+                        selected: _selectedIndex == 1,
+                        isFirst: false,
+                        onTap: () => _onNavTap(1),
+                      ),
+                      _DarkNavItem(
+                        icon: Icons.person_rounded,
+                        outlineIcon: Icons.person_outline_rounded,
+                        label: localeProvider.tr('profile'),
+                        selected: _selectedIndex == 2,
+                        isFirst: false,
+                        onTap: () => _onNavTap(2),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),

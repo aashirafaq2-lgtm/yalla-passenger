@@ -113,7 +113,10 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
                             context, 
                             'Next', 
                             () async {
-                              final success = await auth.login('+964${_phoneController.text}');
+                              final success = await auth.login(
+                                '+964${_phoneController.text}',
+                                fullName: _nameController.text.trim(),
+                              );
                               if (success) {
                                 Navigator.push(
                                   context,
