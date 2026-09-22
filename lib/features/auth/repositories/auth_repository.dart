@@ -1,6 +1,6 @@
 import 'dart:convert';
-import '../network/api_service.dart';
-import '../services/storage_service.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/services/storage_service.dart';
 
 class AuthRepository {
   final ApiService _apiService;
