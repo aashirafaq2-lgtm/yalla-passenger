@@ -14,8 +14,8 @@ class OtpVerificationScreen extends StatefulWidget {
 }
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  final List<TextEditingController> _controllers = List.generate(4, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +53,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   Text('Verify Phone', style: AppTypography.h2Bold.copyWith(fontSize: 32)),
                   const SizedBox(height: 12),
                   const Text(
-                    'We sent a 4-digit code to your number.',
+                    'We sent a 6-digit code to your number.',
                     style: TextStyle(color: Colors.black54, fontSize: 16),
                   ),
                   const SizedBox(height: 40),
@@ -61,30 +61,30 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   // OTP PIN Entry
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(4, (index) {
+                    children: List.generate(6, (index) {
                       return SizedBox(
-                        width: 70,
-                        height: 80,
+                        width: 48,
+                        height: 60,
                         child: TextField(
                           controller: _controllers[index],
                           focusNode: _focusNodes[index],
                           onChanged: (value) {
-                            if (value.isNotEmpty && index < 3) {
+                            if (value.isNotEmpty && index < 5) {
                               _focusNodes[index + 1].requestFocus();
                             }
                           },
                           textAlign: TextAlign.center,
                           keyboardType: TextInputType.number,
                           maxLength: 1,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                           decoration: InputDecoration(
                             counterText: '',
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(15),
                               borderSide: const BorderSide(color: Colors.black12),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(15),
                               borderSide: const BorderSide(color: AppColors.primaryOrange, width: 2),
                             ),
                           ),
