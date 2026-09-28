@@ -19,7 +19,7 @@ class SocketService {
     final token = await _storageService.getToken();
     final userId = await _storageService.getUserId();
 
-    socket = IO.io('http://72.62.50.86',
+    socket = IO.io('https://api-yalla.aaaj.shop',
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .setAuth({'token': token ?? ''})
