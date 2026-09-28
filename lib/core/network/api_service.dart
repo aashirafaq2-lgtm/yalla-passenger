@@ -1,19 +1,35 @@
 import 'package:dio/dio.dart';
+import '../services/storage_service.dart';
 
 class ApiService {
-  final Dio dio = Dio(
-    BaseOptions(
-      baseUrl: 'http://72.62.50.86/api',
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    ),
-  );
+  final StorageService _storageService = StorageService();
+  late final Dio dio;
 
   ApiService() {
+    dio = Dio(
+      BaseOptions(
+        baseUrl: 'http://72.62.50.86/api',
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        if (!options.headers.containsKey('Authorization')) {
+          final token = await _storageService.getToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+        }
+        return handler.next(options);
+      },
+    ));
+
     dio.interceptors.add(LogInterceptor(responseBody: true, requestBody: true));
   }
 
@@ -72,6 +88,42 @@ class ApiService {
     return await dio.post('/ride/review', data: {'rideId': rideId, 'rating': rating, 'comment': comment}, options: Options(headers: {'Authorization': 'Bearer $token'}));
   }
 
+  // Rides & Active Tracking
+  Future<Response> getEstimate({
+    required double pickupLat,
+    required double pickupLng,
+    required double dropLat,
+    required double dropLng,
+    String? token,
+  }) async {
+    return await dio.post(
+      '/ride/estimate',
+      data: {
+        'pickupLat': pickupLat,
+        'pickupLng': pickupLng,
+        'dropLat': dropLat,
+        'dropLng': dropLng,
+      },
+      options: token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null,
+    );
+  }
+
+  Future<Response> getActiveRide(String token) async {
+    return await dio.get('/ride/active', options: Options(headers: {'Authorization': 'Bearer $token'}));
+  }
+
+  Future<Response> cancelRide(String rideId, String reason, String token) async {
+    return await dio.patch(
+      '/ride/cancel',
+      data: {'rideId': rideId, 'reason': reason},
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+  }
+
+  Future<Response> getChatMessages(String rideId, String token) async {
+    return await dio.get('/chat/$rideId', options: Options(headers: {'Authorization': 'Bearer $token'}));
+  }
+
   // Governorates
   Future<Response> getGovernorates() async {
     return await dio.get('/trips/governorates');
@@ -107,8 +159,12 @@ class ApiService {
     });
   }
 
-  Future<Response> getMapConfig() async {
-    return await dio.get('/map/config');
+  Future<Response> getNotifications(String token) async {
+    return await dio.get('/user/notifications', options: Options(headers: {'Authorization': 'Bearer $token'}));
+  }
+
+  Future<Response> markNotificationsRead(String token) async {
+    return await dio.patch('/user/notifications/mark-read', options: Options(headers: {'Authorization': 'Bearer $token'}));
   }
 }
 

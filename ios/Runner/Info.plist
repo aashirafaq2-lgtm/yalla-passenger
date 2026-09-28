@@ -2,6 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.yalla.yallaPassenger</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>yallapassenger</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Yalla requires camera access to allow you to take photos of documents and parcels for delivery requests.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

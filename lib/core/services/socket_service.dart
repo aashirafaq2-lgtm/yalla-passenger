@@ -10,7 +10,10 @@ class SocketService {
   // Callbacks – set by screens that need them
   Function(dynamic)? onRideAccepted;
   Function(dynamic)? onDriverMoved;
-  Function(dynamic)? onNewRideRequest; // for driver app if ever shared
+  Function(dynamic)? onRideStatusUpdate;
+  Function(dynamic)? onNewMessage;
+  Function(dynamic)? onRideCancelled;
+  Function(dynamic)? onNewRideRequest;
 
   void connect() async {
     final token = await _storageService.getToken();
@@ -20,6 +23,8 @@ class SocketService {
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .setAuth({'token': token ?? ''})
+          .enableAutoConnect()
+          .enableReconnection()
           .build());
 
     socket.connect();
@@ -43,14 +48,36 @@ class SocketService {
       onDriverMoved?.call(data);
     });
 
+    socket.on('ride_status_update', (data) {
+      print('[Socket] Received ride_status_update: $data');
+      onRideStatusUpdate?.call(data);
+    });
+
+    socket.on('new_message', (data) {
+      onNewMessage?.call(data);
+    });
+
+    socket.on('receive_message', (data) {
+      onNewMessage?.call(data);
+    });
+
     socket.on('new_ride_request', (data) {
       onNewRideRequest?.call(data);
     });
 
     socket.on('notification', (data) {
       print('[Socket] Global Notification received: $data');
-      // Logic to show local notification can be added here or via callback
-      onDriverMoved?.call(data); // Reusing for generic notification or creating new callback
+      if (data is Map) {
+        final payload = data['data'] ?? data;
+        final type = payload['type'] ?? data['type'];
+        if (type == 'RIDE_ACCEPTED') {
+          onRideAccepted?.call(payload);
+        } else if (type == 'RIDE_STATUS') {
+          onRideStatusUpdate?.call(payload);
+        } else if (type == 'RIDE_CANCELLED') {
+          onRideCancelled?.call(payload);
+        }
+      }
     });
 
     socket.onDisconnect((_) => print('[Socket] Disconnected'));

@@ -9,6 +9,8 @@ import 'payment_method_screen.dart';
 import 'language_screen.dart';
 import 'support_screen.dart';
 import 'passenger_trips_screen.dart';
+import 'passenger_profile_edit_screen.dart';
+import 'passenger_notifications_screen.dart';
 
 class PassengerProfileScreen extends StatefulWidget {
   const PassengerProfileScreen({super.key});
@@ -127,9 +129,28 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                                   style: const TextStyle(fontSize: 20, color: Colors.black54, fontWeight: FontWeight.w500)
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  displayName, 
-                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black)
+                                Row(
+                                  children: [
+                                    Text(
+                                      displayName, 
+                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black)
+                                    ),
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_note_rounded, color: AppColors.primaryOrange, size: 24),
+                                      onPressed: () async {
+                                        final updated = await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => PassengerProfileEditScreen(currentUser: _user),
+                                          ),
+                                        );
+                                        if (updated == true) {
+                                          _loadProfile();
+                                        }
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -169,6 +190,9 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                         delay: const Duration(milliseconds: 200),
                         child: Column(
                           children: [
+                            _buildFormattedMenuItem(Icons.notifications_none_rounded, localeProvider.isArabic ? 'الإشعارات' : 'Notifications', () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const PassengerNotificationsScreen()));
+                            }),
                             _buildFormattedMenuItem(Icons.credit_card, localeProvider.tr('payment_method'), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentMethodScreen()));
                             }),

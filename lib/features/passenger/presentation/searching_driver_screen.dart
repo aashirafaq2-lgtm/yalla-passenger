@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'active_ride_screen.dart';
 
 class SearchingDriverScreen extends StatefulWidget {
@@ -18,10 +21,13 @@ class SearchingDriverScreen extends StatefulWidget {
 class _SearchingDriverScreenState extends State<SearchingDriverScreen> with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   bool _driverAccepted = false;
+  String? _activeRideId;
 
   @override
   void initState() {
     super.initState();
+    _activeRideId = (widget.rideData?['id'] ?? widget.rideData?['rideId'])?.toString();
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -37,9 +43,12 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
     final storageService = Provider.of<StorageService>(context, listen: false);
     final userId = await storageService.getUserId() ?? 'passenger_${DateTime.now().millisecondsSinceEpoch}';
 
+    final rideId = _activeRideId ?? 'ride_${DateTime.now().millisecondsSinceEpoch}';
+    _activeRideId = rideId;
+
     final payload = {
-      'id': widget.rideData?['id'] ?? 'ride_${DateTime.now().millisecondsSinceEpoch}',
-      'rideId': widget.rideData?['id'] ?? 'ride_${DateTime.now().millisecondsSinceEpoch}',
+      'id': rideId,
+      'rideId': rideId,
       'passengerId': userId,
       'passengerName': widget.rideData?['passengerName'] ?? 'Passenger',
       'passengerPhone': widget.rideData?['passengerPhone'] ?? '07700000000',
@@ -51,37 +60,97 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
       'dropLng': widget.rideData?['dropLng'] ?? 44.3800,
       'estimatedPrice': widget.rideData?['estimatedPrice'] ?? 10000,
       'serviceType': widget.rideData?['serviceType'] ?? 'Economy',
+      'otp': widget.rideData?['otp'],
     };
 
-    // Emit live request to all available online drivers
+    // Emit live request to nearby drivers
     socketService.requestRide(payload);
 
     // Listen for driver acceptance
     socketService.onRideAccepted = (driverData) {
       if (!mounted || _driverAccepted) return;
       _driverAccepted = true;
+
+      // Merge driver acceptance data with original ride data (e.g. otp, pickup/drop)
+      final mergedData = Map<String, dynamic>.from(widget.rideData ?? {});
+      if (driverData is Map) {
+        mergedData.addAll(Map<String, dynamic>.from(driverData));
+      }
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => ActiveRideScreen(rideData: driverData)),
+        MaterialPageRoute(builder: (_) => ActiveRideScreen(rideData: mergedData)),
       );
     };
 
-    // Fallback safety timeout if no live driver answers in 15 seconds
-    Future.delayed(const Duration(seconds: 15), () {
+    // Real production timeout (45s)
+    Future.delayed(const Duration(seconds: 45), () {
       if (mounted && !_driverAccepted) {
-        _driverAccepted = true;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => ActiveRideScreen(rideData: {
-            ...payload,
-            'driverName': 'Ali Ahmed (Yalla VIP)',
-            'carModel': 'Toyota Camry (White)',
-            'plate': 'Baghdad 84920',
-            'rating': 4.9,
-          })),
+        final locale = Provider.of<LocaleProvider>(context, listen: false);
+        final isArabic = locale.isArabic;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              isArabic ? 'لا يوجد كباتن متاحين حالياً' : 'No Drivers Available',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: Text(
+              isArabic
+                  ? 'جميع الكباتن القريبين منك مشغولون حالياً. هل ترغب بإعادة البحث أو إلغاء الطلب؟'
+                  : 'All nearby drivers are currently busy. Would you like to retry searching or cancel?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _cancelRequest();
+                },
+                child: Text(
+                  isArabic ? 'إلغاء الطلب' : 'Cancel Request',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryOrange,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _dispatchRealtimeRideRequest(); // Retry search
+                },
+                child: Text(
+                  isArabic ? 'إعادة البحث' : 'Retry Search',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
         );
       }
     });
+  }
+
+  Future<void> _cancelRequest() async {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    final api = Provider.of<ApiService>(context, listen: false);
+    final token = await storage.getToken();
+
+    if (token != null && _activeRideId != null) {
+      try {
+        await api.cancelRide(_activeRideId!, 'Cancelled while searching', token);
+      } catch (e) {
+        debugPrint('Cancel ride note: $e');
+      }
+    }
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -92,18 +161,27 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
 
   @override
   Widget build(BuildContext context) {
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
             const SizedBox(height: 48),
-            Text('Finding your Ride', style: AppTypography.h2Bold.copyWith(fontSize: 32)),
-            const SizedBox(height: 12),
-            const Text('Connecting you with the nearest driver', style: TextStyle(color: Colors.black45)),
-            
+            Text(
+              isArabic ? 'جاري البحث عن كابتن...' : 'Finding your Ride',
+              style: AppTypography.h2Bold.copyWith(fontSize: 28),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              isArabic ? 'نقوم بالتواصل مع أقرب الكباتن المتاحين لك' : 'Connecting you with the nearest captain',
+              style: GoogleFonts.inter(color: Colors.black45, fontSize: 14),
+            ),
+
             const Spacer(),
-            
+
             // Radar Animation
             Center(
               child: Stack(
@@ -128,7 +206,7 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
                       },
                     );
                   }),
-                  // Central Brand Icon
+                  // Central Brand Badge
                   Pulse(
                     infinite: true,
                     child: Container(
@@ -143,7 +221,7 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
                         child: Text(
                           'يَلَّا',
                           textDirection: TextDirection.rtl,
-                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -151,18 +229,26 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
                 ],
               ),
             ),
-            
+
             const Spacer(),
-            
+
             // Cancel Button
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('CANCEL REQUEST', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                onPressed: _cancelRequest,
+                child: Text(
+                  isArabic ? 'إلغاء الطلب' : 'CANCEL REQUEST',
+                  style: GoogleFonts.outfit(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
           ],
         ),
       ),

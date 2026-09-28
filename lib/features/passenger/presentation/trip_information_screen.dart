@@ -245,7 +245,13 @@ class TripInformationScreen extends StatelessWidget {
                         ),
                         onPressed: () {
                           Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => ActiveRideScreen(rideData: rideData),
+                            builder: (_) => ActiveRideScreen(rideData: rideData ?? {
+                              'driverName': driverName,
+                              'carModel': carModel,
+                              'plate': plate,
+                              'from': from,
+                              'to': to,
+                            }),
                           ));
                         },
                         child: const Text('Confirm your reservation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
@@ -295,21 +301,6 @@ class TripInformationScreen extends StatelessWidget {
         Icon(icon, size: 28, color: Colors.black),
         const SizedBox(height: 6),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-      ],
-    );
-  }
-
-  Widget _buildDetailItem(String label, String value, {bool isRight = false, IconData? icon}) {
-    return Column(
-      crossAxisAlignment: isRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        if (icon != null) Icon(icon, size: 24, color: Colors.black),
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        Text(
-          value,
-          textAlign: isRight ? TextAlign.right : TextAlign.left,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
       ],
     );
   }

@@ -151,19 +151,20 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
   }
 
   Widget _buildRideCard(dynamic ride) {
-    final driverName = ride['driver'] != null
-        ? '${ride['driver']['firstName']} ${ride['driver']['lastName']}'
-        : 'Adnan Dirjal'; // Mocked name to match screenshot sample
-    final price = ride['price'] != null ? '${ride['price']} IQD' : '10,000 IQD';
+    final dynamic rawDriver = ride is Map ? ride['driver'] : null;
+    final driverName = rawDriver is Map
+        ? '${rawDriver['firstName'] ?? ''} ${rawDriver['lastName'] ?? ''}'.trim()
+        : 'Captain Adnan';
+    final price = ride is Map && ride['price'] != null ? '${ride['price']} IQD' : '10,000 IQD';
     final date = 'Feb 14 Saturday roam ride'; // Specific date format to match screenshot
-    final from = ride['originName'] ?? 'Kirkuk, --';
-    final to = ride['destinationName'] ?? 'Erbil, --';
+    final from = (ride is Map ? ride['originName'] : null) ?? 'Kirkuk, --';
+    final to = (ride is Map ? ride['destinationName'] : null) ?? 'Erbil, --';
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const TripInformationScreen()),
+          MaterialPageRoute(builder: (_) => TripInformationScreen(rideData: ride)),
         );
       },
       child: Container(

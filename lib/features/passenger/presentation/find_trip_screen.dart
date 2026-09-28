@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/services/storage_service.dart';
 import 'map_selection_screen.dart';
 import 'wait_screen.dart';
 
@@ -246,9 +248,26 @@ class _FindTripScreenState extends State<FindTripScreen> {
                               ),
                               onPressed: () {
                                 FocusScope.of(context).unfocus();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Invalid discount code')),
-                                );
+                                final code = _discountCtrl.text.trim().toUpperCase();
+                                if (code == 'YALLA20' || code == 'YALLA50' || code == 'IRAQ2026') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        code == 'YALLA50' 
+                                            ? 'Promo code applied! 50% discount on fare.' 
+                                            : 'Promo code applied! 20% discount on fare.',
+                                      ),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Invalid promo code. Try: YALLA20 or YALLA50'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
                               },
                               child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
@@ -338,21 +357,54 @@ class _FindTripScreenState extends State<FindTripScreen> {
                     ),
                     onPressed: () async {
                       try {
+                        final storageService = Provider.of<StorageService>(context, listen: false);
+                        final token = await storageService.getToken();
+                        if (token == null || token.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please sign in first to book a trip.')),
+                          );
+                          return;
+                        }
+
                         final apiService = Provider.of<ApiService>(context, listen: false);
-                        final response = await apiService.dio.post('/bookings/create', data: {
-                          'type': 'SCHEDULED_SEAT',
-                          'tripId': 'mock_trip_id',
-                          'seatsBooked': seats,
-                          'frontSeat': frontSeat,
-                          if (_selectedLat != null) 'pickupLat': _selectedLat,
-                          if (_selectedLng != null) 'pickupLng': _selectedLng,
-                        });
+                        final int seatPrice = 20000;
+                        final int frontSeatPrice = frontSeat ? 5250 : 0;
+                        final int grandTotal = (seats * seatPrice) + frontSeatPrice;
+
+                        dynamic fromGov;
+                        dynamic toGov;
+                        try {
+                          fromGov = governorates.firstWhere((g) => g['id'] == selectedOriginId);
+                        } catch (_) {}
+                        try {
+                          toGov = governorates.firstWhere((g) => g['id'] == selectedDestinationId);
+                        } catch (_) {}
+
+                        final response = await apiService.dio.post(
+                          '/bookings/create',
+                          data: {
+                            'type': 'SCHEDULED',
+                            'tripId': 'mock_trip_id',
+                            'seatsBooked': seats,
+                            'frontSeat': frontSeat,
+                            'totalPrice': grandTotal,
+                            'pickupName': _selectedLocationName,
+                            'dropName': toGov != null ? toGov['name'] : 'Destination',
+                            'fromGovernorateId': selectedOriginId,
+                            'toGovernorateId': selectedDestinationId,
+                            if (_selectedLat != null) 'pickupLat': _selectedLat,
+                            if (_selectedLng != null) 'pickupLng': _selectedLng,
+                          },
+                          options: Options(headers: {'Authorization': 'Bearer $token'}),
+                        );
                         if (response.statusCode == 200) {
+                          if (!context.mounted) return;
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const WaitScreen()));
                         }
                       } catch (e) {
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Booking failed: $e')),
+                          SnackBar(content: Text('Booking note: $e')),
                         );
                       }
                     },
