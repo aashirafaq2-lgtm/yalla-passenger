@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/storage_service.dart';
 import '../../auth/presentation/passenger_welcome_screen.dart';
+import '../../passenger/presentation/passenger_main_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -51,7 +54,8 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
     );
     _textFade = CurvedAnimation(parent: _textController, curve: Curves.easeIn);
-    _textSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+    _textSlide =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
       CurvedAnimation(parent: _textController, curve: Curves.easeOutCubic),
     );
 
@@ -63,11 +67,23 @@ class _SplashScreenState extends State<SplashScreen>
     if (mounted) _logoController.forward();
     await Future.delayed(const Duration(milliseconds: 800));
     if (mounted) _textController.forward();
-    await Future.delayed(const Duration(milliseconds: 1800));
+    await Future.delayed(const Duration(milliseconds: 1600));
     if (mounted) {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      String? token;
+      try {
+        token = await storage.getToken().timeout(const Duration(seconds: 4));
+      } catch (error) {
+        debugPrint('[Splash] Could not restore saved session: $error');
+      }
+      final hasSession = token != null && token.isNotEmpty;
+      if (!mounted) return;
+
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => const PassengerWelcomeScreen(),
+          pageBuilder: (_, a, __) => hasSession
+              ? const PassengerMainScreen()
+              : const PassengerWelcomeScreen(),
           transitionsBuilder: (_, a, __, child) =>
               FadeTransition(opacity: a, child: child),
           transitionDuration: const Duration(milliseconds: 600),
@@ -220,11 +236,13 @@ class _SplashScreenState extends State<SplashScreen>
 
                           // Clean Subtitle Badge
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.18),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white.withOpacity(0.3)),
+                              border: Border.all(
+                                  color: Colors.white.withOpacity(0.3)),
                             ),
                             child: const Text(
                               'Ride & Delivery',

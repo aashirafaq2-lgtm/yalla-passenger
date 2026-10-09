@@ -5,6 +5,11 @@ import '../../../core/providers/locale_provider.dart';
 import 'passenger_home_screen.dart';
 import 'passenger_trips_screen.dart';
 import 'passenger_profile_screen.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/services/storage_service.dart';
+import '../../../core/services/socket_service.dart';
+import 'active_ride_screen.dart';
+import 'searching_driver_screen.dart';
 
 class PassengerMainScreen extends StatefulWidget {
   const PassengerMainScreen({super.key});
@@ -23,6 +28,38 @@ class _PassengerMainScreenState extends State<PassengerMainScreen> {
   ];
 
   final PageController _pageController = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkActiveRide();
+    });
+  }
+
+  Future<void> _checkActiveRide() async {
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final api = Provider.of<ApiService>(context, listen: false);
+      final socket = Provider.of<SocketService>(context, listen: false);
+      await socket.connect();
+
+      final token = await storage.getToken();
+      if (token == null) return;
+
+      final res = await api.getActiveRide(token);
+      if (res.statusCode == 200 && res.data != null && res.data['activeRide'] != null) {
+        final r = res.data['activeRide'];
+        if (['ACCEPTED', 'STARTED', 'ARRIVED', 'PICKED_UP', 'ONGOING', 'TRIPPING'].contains(r['status'])) {
+           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ActiveRideScreen(rideData: r)));
+        } else if (r['status'] == 'REQUESTED') {
+           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => SearchingDriverScreen(rideData: r)));
+        }
+      }
+    } catch (e) {
+      debugPrint('[PassengerMain] Active ride check failed: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -8,6 +8,8 @@ import '../../../core/services/storage_service.dart';
 import 'map_selection_screen.dart';
 import 'wait_screen.dart';
 
+import '../../../core/providers/locale_provider.dart';
+
 class FindTripScreen extends StatefulWidget {
   const FindTripScreen({super.key});
 
@@ -27,6 +29,28 @@ class _FindTripScreenState extends State<FindTripScreen> {
   String _selectedLocationName = 'Choose Your location';
   double? _selectedLat;
   double? _selectedLng;
+
+  // Fallback: all 18 Iraqi governorates — used when the API call fails
+  static const List<Map<String, String>> _fallbackGovernorates = [
+    {'id': 'gov_baghdad',       'name': 'Baghdad',       'nameAr': 'بغداد'},
+    {'id': 'gov_basra',         'name': 'Basra',         'nameAr': 'البصرة'},
+    {'id': 'gov_mosul',         'name': 'Mosul',         'nameAr': 'الموصل'},
+    {'id': 'gov_erbil',         'name': 'Erbil',         'nameAr': 'أربيل'},
+    {'id': 'gov_kirkuk',        'name': 'Kirkuk',        'nameAr': 'كركوك'},
+    {'id': 'gov_sulaymaniyah',  'name': 'Sulaymaniyah',  'nameAr': 'السليمانية'},
+    {'id': 'gov_najaf',         'name': 'Najaf',         'nameAr': 'النجف'},
+    {'id': 'gov_karbala',       'name': 'Karbala',       'nameAr': 'كربلاء'},
+    {'id': 'gov_anbar',         'name': 'Anbar',         'nameAr': 'الأنبار'},
+    {'id': 'gov_diyala',        'name': 'Diyala',        'nameAr': 'ديالى'},
+    {'id': 'gov_babylon',       'name': 'Babylon',       'nameAr': 'بابل'},
+    {'id': 'gov_wasit',         'name': 'Wasit',         'nameAr': 'واسط'},
+    {'id': 'gov_missan',        'name': 'Missan',        'nameAr': 'ميسان'},
+    {'id': 'gov_thiqar',        'name': 'Dhi Qar',       'nameAr': 'ذي قار'},
+    {'id': 'gov_qadisiyah',     'name': 'Qadisiyah',     'nameAr': 'القادسية'},
+    {'id': 'gov_muthanna',      'name': 'Muthanna',      'nameAr': 'المثنى'},
+    {'id': 'gov_saladin',       'name': 'Saladin',       'nameAr': 'صلاح الدين'},
+    {'id': 'gov_duhok',         'name': 'Duhok',         'nameAr': 'دهوك'},
+  ];
 
   @override
   void initState() {
@@ -48,18 +72,27 @@ class _FindTripScreenState extends State<FindTripScreen> {
       final apiService = Provider.of<ApiService>(context, listen: false);
       final response = await apiService.getGovernorates();
       if (response.statusCode == 200) {
-        setState(() {
-          governorates = response.data['governorates'];
-          if (governorates.isNotEmpty) {
-            selectedOriginId = governorates[0]['id'];
-            selectedDestinationId = governorates.length > 1 ? governorates[1]['id'] : governorates[0]['id'];
-          }
-          isLoading = false;
-        });
+        final data = response.data['governorates'];
+        if (data is List && data.isNotEmpty) {
+          setState(() {
+            governorates = data;
+            selectedOriginId = governorates[0]['id']?.toString();
+            selectedDestinationId = governorates.length > 1
+                ? governorates[1]['id']?.toString()
+                : governorates[0]['id']?.toString();
+            isLoading = false;
+          });
+          return;
+        }
       }
-    } catch (e) {
-      setState(() => isLoading = false);
-    }
+    } catch (_) {}
+    // Fallback to hardcoded Iraqi governorates
+    setState(() {
+      governorates = _fallbackGovernorates;
+      selectedOriginId = _fallbackGovernorates[0]['id'];
+      selectedDestinationId = _fallbackGovernorates[1]['id'];
+      isLoading = false;
+    });
   }
 
   @override
@@ -67,6 +100,9 @@ class _FindTripScreenState extends State<FindTripScreen> {
     if (isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -89,15 +125,19 @@ class _FindTripScreenState extends State<FindTripScreen> {
                         border: Border.all(color: Colors.black12),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Center(
                         child: Text(
-                          'Find a trip now',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          isArabic ? 'ابحث عن رحلة الآن' : 'Find a trip now',
+                          style: TextStyle(
+                            fontSize: 22, 
+                            fontWeight: FontWeight.bold,
+                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          ),
                         ),
                       ),
                     ),
@@ -126,9 +166,9 @@ class _FindTripScreenState extends State<FindTripScreen> {
                       Row(
                         children: [
                           _buildDropdown(selectedOriginId, (val) => setState(() => selectedOriginId = val!)),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            child: Icon(Icons.arrow_right_alt, size: 30),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
                           ),
                           _buildDropdown(selectedDestinationId, (val) => setState(() => selectedDestinationId = val!)),
                         ],
@@ -136,7 +176,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                       const SizedBox(height: 16),
                       // Number of seats
                       _buildFormRow(
-                        'Number of seats',
+                        isArabic ? 'عدد المقاعد' : 'Number of seats',
                         Row(
                           children: [
                             _buildCounterButton(Icons.remove, () {
@@ -151,20 +191,22 @@ class _FindTripScreenState extends State<FindTripScreen> {
                             }),
                           ],
                         ),
+                        isArabic,
                       ),
                       const SizedBox(height: 16),
                       // Front seat
                       _buildFormRow(
-                        'Front seat',
+                        isArabic ? 'المقعد الأمامي' : 'Front seat',
                         Checkbox(
                           value: frontSeat,
                           onChanged: (val) => setState(() => frontSeat = val!),
                           activeColor: AppColors.primaryOrange,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                         ),
+                        isArabic,
                       ),
                       const SizedBox(height: 16),
-                      // Choose your location (per Figure 1)
+                      // Choose your location
                       GestureDetector(
                         onTap: () async {
                           final result = await Navigator.push(
@@ -173,7 +215,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                           );
                           if (result != null && result is Map) {
                             setState(() {
-                              _selectedLocationName = result['name'] ?? result['address'] ?? 'Selected Location';
+                              _selectedLocationName = result['name'] ?? result['address'] ?? (isArabic ? 'الموقع المحدد' : 'Selected Location');
                               _selectedLat = result['lat'] as double?;
                               _selectedLng = result['lng'] as double?;
                             });
@@ -193,11 +235,12 @@ class _FindTripScreenState extends State<FindTripScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  _selectedLocationName,
+                                  _selectedLat != null ? _selectedLocationName : (isArabic ? 'حدد موقعك على الخريطة' : 'Choose Your location'),
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 16,
                                     color: _selectedLat != null ? Colors.black87 : Colors.black54,
+                                    fontFamily: isArabic ? 'NotoKufiArabic' : null,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -210,7 +253,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Discount code — Apply turns dark orange when code entered
+                      // Discount code
                       Row(
                         children: [
                           Expanded(
@@ -225,10 +268,10 @@ class _FindTripScreenState extends State<FindTripScreen> {
                                 controller: _discountCtrl,
                                 textInputAction: TextInputAction.done,
                                 onSubmitted: (_) => FocusScope.of(context).unfocus(),
-                                decoration: const InputDecoration(
-                                  hintText: 'Discount code',
+                                decoration: InputDecoration(
+                                  hintText: isArabic ? 'كود الخصم' : 'Discount code',
                                   border: InputBorder.none,
-                                  hintStyle: TextStyle(fontSize: 16, color: Colors.black26),
+                                  hintStyle: const TextStyle(fontSize: 16, color: Colors.black26),
                                 ),
                                 style: const TextStyle(fontSize: 16),
                               ),
@@ -246,34 +289,70 @@ class _FindTripScreenState extends State<FindTripScreen> {
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
-                              onPressed: () {
+                              onPressed: () async {
                                 FocusScope.of(context).unfocus();
                                 final code = _discountCtrl.text.trim().toUpperCase();
-                                if (code == 'YALLA20' || code == 'YALLA50' || code == 'IRAQ2026') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        code == 'YALLA50' 
-                                            ? 'Promo code applied! 50% discount on fare.' 
-                                            : 'Promo code applied! 20% discount on fare.',
-                                      ),
-                                      backgroundColor: AppColors.success,
-                                    ),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Invalid promo code. Try: YALLA20 or YALLA50'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
+                                if (code.isEmpty) return;
+
+                                try {
+                                  final api = Provider.of<ApiService>(context, listen: false);
+                                  final storage = Provider.of<StorageService>(context, listen: false);
+                                  final token = await storage.getToken();
+                                  final res = await api.validatePromo(code, token);
+
+                                  if (res.statusCode == 200 && res.data['valid'] == true) {
+                                    final discount = res.data['discountPercent'] ?? 20;
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            isArabic
+                                                ? 'تم تطبيق الكود! خصم $discount% على الأجرة.'
+                                                : 'Promo code applied! $discount% discount on fare.',
+                                          ),
+                                          backgroundColor: AppColors.success,
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(isArabic ? 'كود الخصم غير صحيح. جرب: YALLA20' : 'Invalid promo code. Try: YALLA20 or YALLA50'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } catch (e) {
+                                  // Fallback client check if offline
+                                  if (code == 'YALLA20' || code == 'YALLA50' || code == 'IRAQ2026') {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(isArabic ? 'تم تطبيق الخصم بنجاح!' : 'Promo code applied successfully!'),
+                                          backgroundColor: AppColors.success,
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(isArabic ? 'كود الخصم غير صحيح. جرب: YALLA20' : 'Invalid promo code. Try: YALLA20 or YALLA50'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
                                 }
                               },
-                              child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.bold)),
+                              child: Text(isArabic ? 'تطبيق' : 'Apply', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
                       ),
+
 
                     ],
                   ),
@@ -311,24 +390,30 @@ class _FindTripScreenState extends State<FindTripScreen> {
 
                       return Column(
                         children: [
-                          const Text(
-                            'Price details',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          Text(
+                            isArabic ? 'تفاصيل السعر' : 'Price details',
+                            style: TextStyle(
+                              fontSize: 20, 
+                              fontWeight: FontWeight.bold,
+                              fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           _buildPriceRow(
-                            '${seats}x seat',
-                            '${formatIqd(totalSeatsPrice)} IQD',
+                            isArabic ? '$seats مقاعد' : '${seats}x seat',
+                            isArabic ? '${formatIqd(totalSeatsPrice)} د.ع' : '${formatIqd(totalSeatsPrice)} IQD',
                           ),
                           const SizedBox(height: 12),
                           _buildPriceRow(
-                            'Front seat',
-                            frontSeat ? '${formatIqd(frontSeatPrice)} IQD' : 'No',
+                            isArabic ? 'المقعد الأمامي' : 'Front seat',
+                            frontSeat 
+                                ? (isArabic ? '${formatIqd(frontSeatPrice)} د.ع' : '${formatIqd(frontSeatPrice)} IQD') 
+                                : (isArabic ? 'لا' : 'No'),
                           ),
                           const Divider(height: 32),
                           _buildPriceRow(
-                            'Total',
-                            '${formatIqd(grandTotal)} IQD',
+                            isArabic ? 'الإجمالي' : 'Total',
+                            isArabic ? '${formatIqd(grandTotal)} د.ع' : '${formatIqd(grandTotal)} IQD',
                             isTotal: true,
                           ),
                         ],
@@ -361,7 +446,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                         final token = await storageService.getToken();
                         if (token == null || token.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please sign in first to book a trip.')),
+                            SnackBar(content: Text(isArabic ? 'يرجى تسجيل الدخول أولاً لحجز رحلة.' : 'Please sign in first to book a trip.')),
                           );
                           return;
                         }
@@ -399,18 +484,27 @@ class _FindTripScreenState extends State<FindTripScreen> {
                         );
                         if (response.statusCode == 200) {
                           if (!context.mounted) return;
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const WaitScreen()));
+                          final ride = response.data['ride'] ?? response.data['booking'];
+                          final rideMap = ride is Map ? Map<String, dynamic>.from(ride) : null;
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => WaitScreen(rideData: rideMap)));
                         }
                       } catch (e) {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Booking note: $e')),
+                          SnackBar(
+                            content: Text(isArabic ? 'فشل حجز الرحلة. حاول مرة أخرى.' : 'Booking failed. Please try again.'),
+                            backgroundColor: Colors.red,
+                          ),
                         );
                       }
                     },
-                    child: const Text(
-                      'Search now!',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                    child: Text(
+                      isArabic ? 'ابحث الآن!' : 'Search now!',
+                      style: TextStyle(
+                        fontSize: 22, 
+                        fontWeight: FontWeight.w900,
+                        fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                      ),
                     ),
                   ),
                 ),
@@ -425,6 +519,8 @@ class _FindTripScreenState extends State<FindTripScreen> {
   }
 
   Widget _buildDropdown(String? value, ValueChanged<String?> onChanged) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final isArabic = locale.isArabic;
     return Expanded(
       child: Container(
         height: 50,
@@ -443,9 +539,16 @@ class _FindTripScreenState extends State<FindTripScreen> {
             style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
             onChanged: onChanged,
             items: governorates.map<DropdownMenuItem<String>>((dynamic gov) {
+              final id = gov['id']?.toString() ?? '';
+              final displayName = isArabic
+                  ? (gov['nameAr'] ?? gov['name'] ?? id)
+                  : (gov['name'] ?? id);
               return DropdownMenuItem<String>(
-                value: gov['id'],
-                child: Text(gov['name']),
+                value: id,
+                child: Text(
+                  displayName,
+                  style: TextStyle(fontFamily: isArabic ? 'NotoKufiArabic' : null),
+                ),
               );
             }).toList(),
           ),
@@ -454,7 +557,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
     );
   }
 
-  Widget _buildFormRow(String label, Widget action) {
+  Widget _buildFormRow(String label, Widget action, [bool isArabic = false]) {
     return Container(
       height: 55,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -467,7 +570,14 @@ class _FindTripScreenState extends State<FindTripScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+          Text(
+            label, 
+            style: TextStyle(
+              fontWeight: FontWeight.w600, 
+              fontSize: 16,
+              fontFamily: isArabic ? 'NotoKufiArabic' : null,
+            ),
+          ),
           action,
         ],
       ),

@@ -6,7 +6,9 @@ import '../../../core/network/api_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/providers/locale_provider.dart';
 import 'payment_method_screen.dart';
+import 'wallet_screen.dart';
 import 'language_screen.dart';
+
 import 'support_screen.dart';
 import 'passenger_trips_screen.dart';
 import 'passenger_profile_edit_screen.dart';
@@ -193,6 +195,10 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                             _buildFormattedMenuItem(Icons.notifications_none_rounded, localeProvider.isArabic ? 'الإشعارات' : 'Notifications', () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const PassengerNotificationsScreen()));
                             }),
+                            _buildFormattedMenuItem(Icons.account_balance_wallet_outlined, localeProvider.isArabic ? 'المحفظة الإلكترونية' : 'Digital Wallet', () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const PassengerWalletScreen())).then((_) => _loadProfile());
+                            }),
+
                             _buildFormattedMenuItem(Icons.credit_card, localeProvider.tr('payment_method'), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentMethodScreen()));
                             }),
@@ -202,6 +208,7 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                             _buildFormattedMenuItem(Icons.language, localeProvider.tr('language'), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const LanguageScreen()));
                             }),
+
                             _buildFormattedMenuItem(Icons.support_agent_outlined, localeProvider.tr('support'), () {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen()));
                             }),

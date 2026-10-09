@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/network/api_service.dart';
 
@@ -27,21 +28,55 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
   String _selectedAddressName = 'Locating address...';
   String _selectedFullAddress = 'Iraq';
   bool _isLoadingAddress = false;
+  bool _isLoadingPlace = false;
   Timer? _debounceTimer;
 
   // Search state
   final TextEditingController _searchController = TextEditingController();
-  List<dynamic> _searchResults = [];
+  List<dynamic> _searchPredictions = [];
   bool _isSearching = false;
   bool _showSearchResults = false;
 
   @override
   void initState() {
     super.initState();
-    _currentCenter = widget.initialPosition ?? const LatLng(33.3152, 44.3661); // Baghdad default
+    _currentCenter = widget.initialPosition ?? const LatLng(33.3412, 44.4009);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _reverseGeocode(_currentCenter);
+      _fetchDeviceLocation();
     });
+  }
+
+  /// Fetch real GPS location from device, fallback to map center if denied
+  Future<void> _fetchDeviceLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _reverseGeocode(_currentCenter);
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _reverseGeocode(_currentCenter);
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 8));
+      final gpsPos = LatLng(pos.latitude, pos.longitude);
+      if (mounted) {
+        setState(() => _currentCenter = gpsPos);
+        try {
+          _mapController.move(gpsPos, 15.5);
+        } catch (_) {}
+        _reverseGeocode(gpsPos);
+      }
+    } catch (_) {
+      _reverseGeocode(_currentCenter);
+    }
   }
 
   @override
@@ -54,8 +89,12 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
   void _onPositionChanged(MapCamera camera, bool hasGesture) {
     if (hasGesture) {
       _currentCenter = camera.center;
+      setState(() {
+        _selectedAddressName = 'Locating address...';
+        _isLoadingAddress = true;
+      });
       _debounceTimer?.cancel();
-      _debounceTimer = Timer(const Duration(milliseconds: 600), () {
+      _debounceTimer = Timer(const Duration(milliseconds: 700), () {
         _reverseGeocode(_currentCenter);
       });
     }
@@ -70,9 +109,30 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
       final res = await api.reverseGeocode(pos.latitude, pos.longitude);
 
       if (mounted && res.data != null) {
+        // Backend returns: { address: "formatted_address", results: [...] }
+        final address = res.data['address']?.toString() ?? '';
+        final results = res.data['results'] as List? ?? [];
+
+        String shortName = address;
+        // Try to extract short name from address_components
+        if (results.isNotEmpty && results[0]['address_components'] != null) {
+          final components = results[0]['address_components'] as List;
+          String? extractedName;
+          for (final component in components) {
+            final types = (component['types'] as List?) ?? [];
+            if (types.contains('neighborhood') || types.contains('sublocality_level_1') || types.contains('route')) {
+              extractedName = component['long_name']?.toString();
+              break;
+            }
+          }
+          if (extractedName != null && extractedName.isNotEmpty) {
+            shortName = extractedName;
+          }
+        }
+
         setState(() {
-          _selectedAddressName = res.data['name'] ?? 'Selected Pin Location';
-          _selectedFullAddress = res.data['formattedAddress'] ?? 'Iraq';
+          _selectedAddressName = shortName.isNotEmpty ? shortName : 'Selected Location';
+          _selectedFullAddress = address.isNotEmpty ? address : '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
           _isLoadingAddress = false;
         });
       }
@@ -80,7 +140,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
       if (mounted) {
         setState(() {
           _selectedAddressName = 'Pinned Location';
-          _selectedFullAddress = '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}';
+          _selectedFullAddress = '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
           _isLoadingAddress = false;
         });
       }
@@ -89,7 +149,10 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
 
   Future<void> _searchPlaces(String query) async {
     if (query.trim().length < 2) {
-      setState(() => _searchResults = []);
+      setState(() {
+        _searchPredictions = [];
+        _showSearchResults = false;
+      });
       return;
     }
 
@@ -103,10 +166,12 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
       );
 
       if (mounted && res.data != null) {
+        // Backend /api/map/search returns { predictions: [{placeId, description, mainText, secondaryText}] }
+        final predictions = res.data['predictions'] as List? ?? [];
         setState(() {
-          _searchResults = res.data['results'] ?? [];
+          _searchPredictions = predictions;
           _isSearching = false;
-          _showSearchResults = _searchResults.isNotEmpty;
+          _showSearchResults = predictions.isNotEmpty;
         });
       }
     } catch (e) {
@@ -114,19 +179,56 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     }
   }
 
-  void _selectSearchResult(dynamic place) {
-    final lat = (place['lat'] as num).toDouble();
-    final lng = (place['lng'] as num).toDouble();
-    final newPos = LatLng(lat, lng);
+  /// Resolve a Google placeId → lat/lng via /api/map/place-details, then move map
+  Future<void> _selectPrediction(dynamic prediction) async {
+    final placeId = prediction['placeId']?.toString() ?? '';
+    final displayName = (prediction['mainText'] ?? prediction['description'] ?? 'Selected Place').toString();
+    final fullAddress = (prediction['description'] ?? '').toString();
 
-    _mapController.move(newPos, 15.5);
     setState(() {
-      _currentCenter = newPos;
-      _selectedAddressName = place['name'] ?? 'Selected Place';
-      _selectedFullAddress = place['formattedAddress'] ?? '';
       _showSearchResults = false;
-      _searchController.text = _selectedAddressName;
+      _searchController.text = displayName;
+      _isLoadingPlace = true;
+      _selectedAddressName = displayName;
+      _selectedFullAddress = fullAddress;
     });
+
+    if (placeId.isEmpty) {
+      setState(() => _isLoadingPlace = false);
+      return;
+    }
+
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final res = await api.getPlaceDetails(placeId);
+
+      if (mounted && res.data != null) {
+        final lat = (res.data['lat'] as num?)?.toDouble();
+        final lng = (res.data['lng'] as num?)?.toDouble();
+        final address = res.data['address']?.toString() ?? fullAddress;
+        final name = res.data['name']?.toString() ?? displayName;
+
+        if (lat != null && lng != null) {
+          final newPos = LatLng(lat, lng);
+          setState(() {
+            _currentCenter = newPos;
+            _selectedAddressName = name;
+            _selectedFullAddress = address;
+            _isLoadingPlace = false;
+          });
+          try {
+            _mapController.move(newPos, 16.0);
+          } catch (_) {}
+        } else {
+          setState(() => _isLoadingPlace = false);
+        }
+      } else {
+        setState(() => _isLoadingPlace = false);
+      }
+    } catch (e) {
+      debugPrint('[MapSearch] Place details error: $e');
+      if (mounted) setState(() => _isLoadingPlace = false);
+    }
   }
 
   void _confirmSelection() {
@@ -143,7 +245,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // ─── HIGH DEFINITION RETINA MAP ───
+          // ─── MAP ───
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -155,7 +257,6 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
               ),
             ),
             children: [
-              // OpenStreetMap HD Clean Tiles (100% Free & No Watermark)
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.yalla.passenger',
@@ -164,7 +265,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
             ],
           ),
 
-          // ─── CENTER TARGET PIN ───
+          // ─── CENTER PIN ───
           Center(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 42),
@@ -185,7 +286,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
                         : const Text(
-                            'Drag map to position',
+                            'Drag to position',
                             style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                   ),
@@ -200,7 +301,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
             ),
           ),
 
-          // ─── TOP SEARCH & BACK BAR ───
+          // ─── TOP SEARCH BAR ───
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -209,7 +310,6 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                 children: [
                   Row(
                     children: [
-                      // Back Button
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -224,8 +324,6 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-
-                      // Search Input Box
                       Expanded(
                         child: Container(
                           height: 50,
@@ -239,16 +337,29 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                           child: TextField(
                             controller: _searchController,
                             onChanged: _searchPlaces,
+                            textInputAction: TextInputAction.search,
                             decoration: InputDecoration(
-                              hintText: 'Search place, mall, street in Iraq...',
-                              hintStyle: const TextStyle(fontSize: 13, color: Colors.black45),
-                              prefixIcon: const Icon(Icons.search, color: AppColors.primaryOrange),
+                              hintText: 'ابحث عن مكان... / Search a place...',
+                              hintStyle: const TextStyle(fontSize: 12.5, color: Colors.black45),
+                              prefixIcon: _isSearching
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12.0),
+                                      child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryOrange),
+                                      ),
+                                    )
+                                  : const Icon(Icons.search, color: AppColors.primaryOrange),
                               suffixIcon: _searchController.text.isNotEmpty
                                   ? IconButton(
                                       icon: const Icon(Icons.clear, size: 18, color: Colors.black45),
                                       onPressed: () {
                                         _searchController.clear();
-                                        setState(() => _showSearchResults = false);
+                                        setState(() {
+                                          _showSearchResults = false;
+                                          _searchPredictions = [];
+                                        });
                                       },
                                     )
                                   : null,
@@ -261,11 +372,11 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                     ],
                   ),
 
-                  // Search Results Dropdown List
-                  if (_showSearchResults && _searchResults.isNotEmpty)
+                  // Search Predictions Dropdown
+                  if (_showSearchResults && _searchPredictions.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(top: 10),
-                      constraints: const BoxConstraints(maxHeight: 240),
+                      constraints: const BoxConstraints(maxHeight: 280),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
@@ -276,27 +387,31 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                       child: ListView.separated(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         shrinkWrap: true,
-                        itemCount: _searchResults.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemCount: _searchPredictions.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, indent: 56),
                         itemBuilder: (ctx, idx) {
-                          final place = _searchResults[idx];
+                          final place = _searchPredictions[idx];
+                          final secondary = (place['secondaryText'] ?? '').toString();
                           return ListTile(
+                            dense: true,
                             leading: const CircleAvatar(
                               radius: 16,
                               backgroundColor: Color(0xFFFFF7ED),
                               child: Icon(Icons.place_outlined, color: AppColors.primaryOrange, size: 18),
                             ),
                             title: Text(
-                              place['name'] ?? '',
+                              (place['mainText'] ?? place['description'] ?? '').toString(),
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                             ),
-                            subtitle: Text(
-                              place['formattedAddress'] ?? '',
-                              style: const TextStyle(fontSize: 12, color: Colors.black54),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onTap: () => _selectSearchResult(place),
+                            subtitle: secondary.isNotEmpty
+                                ? Text(
+                                    secondary,
+                                    style: const TextStyle(fontSize: 11, color: Colors.black45),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                                : null,
+                            onTap: () => _selectPrediction(place),
                           );
                         },
                       ),
@@ -306,7 +421,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
             ),
           ),
 
-          // ─── BOTTOM ADDRESS CONFIRMATION CARD ───
+          // ─── BOTTOM CONFIRM CARD ───
           Positioned(
             bottom: 24,
             left: 16,
@@ -335,30 +450,37 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                         ),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _selectedAddressName,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                _selectedFullAddress,
-                                style: const TextStyle(fontSize: 12, color: Colors.black54),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
+                          child: _isLoadingPlace
+                              ? const Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Resolving location...', style: TextStyle(fontSize: 13, color: Colors.black54)),
+                                    SizedBox(height: 6),
+                                    LinearProgressIndicator(color: AppColors.primaryOrange),
+                                  ],
+                                )
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _selectedAddressName,
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      _selectedFullAddress,
+                                      style: const TextStyle(fontSize: 12, color: Colors.black54),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 18),
-
-                    // Confirm Button
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -368,7 +490,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: 0,
                         ),
-                        onPressed: _confirmSelection,
+                        onPressed: _isLoadingPlace ? null : _confirmSelection,
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -385,6 +507,19 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                   ],
                 ),
               ),
+            ),
+          ),
+
+          // ── My Location FAB ──
+          Positioned(
+            bottom: 215,
+            right: 16,
+            child: FloatingActionButton.small(
+              backgroundColor: Colors.white,
+              elevation: 6,
+              heroTag: 'myLocationBtnMapSelect',
+              onPressed: _fetchDeviceLocation,
+              child: const Icon(Icons.my_location, color: AppColors.primaryOrange),
             ),
           ),
         ],

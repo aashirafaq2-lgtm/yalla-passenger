@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'parcel_summary_screen.dart';
 import 'map_selection_screen.dart';
 
@@ -15,7 +17,23 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
   String selectedDate = 'Choose date';
   String selectedTime = 'Choose time';
   String? selectedSendingGov;
-  final List<String> governorates = ['Kirkuk', 'Bagdad', 'Erbil', 'Basra', 'Najaf', 'Karbala', 'Mosul'];
+
+  // Governorate name map: key = governorate id/name, value = Arabic name
+  static const List<Map<String, String>> _govList = [
+    {'en': 'Kirkuk',  'ar': 'كركوك'},
+    {'en': 'Baghdad', 'ar': 'بغداد'},
+    {'en': 'Erbil',   'ar': 'أربيل'},
+    {'en': 'Basra',   'ar': 'البصرة'},
+    {'en': 'Najaf',   'ar': 'النجف'},
+    {'en': 'Karbala', 'ar': 'كربلاء'},
+    {'en': 'Mosul',   'ar': 'الموصل'},
+    {'en': 'Duhok',   'ar': 'دهوك'},
+    {'en': 'Sulaymaniyah', 'ar': 'السليمانية'},
+    {'en': 'Anbar',   'ar': 'الأنبار'},
+    {'en': 'Diyala',  'ar': 'ديالى'},
+    {'en': 'Babylon', 'ar': 'بابل'},
+    {'en': 'Saladin', 'ar': 'صلاح الدين'},
+  ];
 
   // Recipient fields
   final TextEditingController _recipientNameCtrl = TextEditingController();
@@ -74,6 +92,13 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
+
+    // Build localized governorate lists
+    final govKeys   = _govList.map((g) => g['en']!).toList();
+    final govLabels = _govList.map((g) => isArabic ? g['ar']! : g['en']!).toList();
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -92,15 +117,19 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                         border: Border.all(color: Colors.black12),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Center(
                         child: Text(
-                          'Sending',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          isArabic ? 'تفاصيل الإرسال' : 'Sending',
+                          style: TextStyle(
+                            fontSize: 22, 
+                            fontWeight: FontWeight.bold,
+                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          ),
                         ),
                       ),
                     ),
@@ -126,33 +155,45 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Date & Time
-                      const Text('Date & Time',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Text(
+                        isArabic ? 'التاريخ والوقت' : 'Date & Time',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 18,
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                        ),
+                      ),
                       const SizedBox(height: 15),
                       Row(
                         children: [
-                          Expanded(child: _buildActionButton(selectedDate, () => _selectDate(context))),
+                          Expanded(child: _buildActionButton(selectedDate == 'Choose date' ? (isArabic ? 'اختر التاريخ' : 'Choose date') : selectedDate, () => _selectDate(context), isArabic)),
                           const SizedBox(width: 15),
-                          Expanded(child: _buildActionButton(selectedTime, () => _selectTime(context))),
+                          Expanded(child: _buildActionButton(selectedTime == 'Choose time' ? (isArabic ? 'اختر الوقت' : 'Choose time') : selectedTime, () => _selectTime(context), isArabic)),
                         ],
                       ),
                       const SizedBox(height: 25),
 
                       // Recipient Information
-                      const Text('Recipient Information',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Text(
+                        isArabic ? 'معلومات المستلم' : 'Recipient Information',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 18,
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                        ),
+                      ),
                       const SizedBox(height: 15),
-                      _buildTextField('Recipient name', controller: _recipientNameCtrl),
+                      _buildTextField(isArabic ? 'اسم المستلم' : 'Recipient name', controller: _recipientNameCtrl),
                       const SizedBox(height: 15),
-                      _buildTextField('Recipient number', controller: _recipientPhoneCtrl, keyboardType: TextInputType.phone),
+                      _buildTextField(isArabic ? 'رقم هاتف المستلم' : 'Recipient number', controller: _recipientPhoneCtrl, keyboardType: TextInputType.phone),
                       const SizedBox(height: 15),
-                      _buildDropdown('Choose the Sending governorate', selectedSendingGov,
-                          governorates, (val) => setState(() => selectedSendingGov = val!)),
+                      _buildDropdown(isArabic ? 'اختر محافظة الإرسال' : 'Choose the Sending governorate', selectedSendingGov,
+                          govKeys, govLabels, (val) => setState(() => selectedSendingGov = val!)),
                       const SizedBox(height: 15),
-                      _buildTextField('Choose sending region'),
+                      _buildTextField(isArabic ? 'اختر منطقة الإرسال' : 'Choose sending region'),
                       const SizedBox(height: 15),
 
-                      // Location Picker (per Sending mail 2 requirement)
+                      // Location Picker
                       GestureDetector(
                         onTap: () async {
                           final result = await Navigator.push(
@@ -161,7 +202,7 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                           );
                           if (result != null && result is Map) {
                             setState(() {
-                              _selectedLocationName = result['name'] ?? result['address'] ?? 'Selected Location';
+                              _selectedLocationName = result['name'] ?? result['address'] ?? (isArabic ? 'الموقع المحدد' : 'Selected Location');
                               _selectedLat = result['lat'] as double?;
                               _selectedLng = result['lng'] as double?;
                             });
@@ -181,11 +222,12 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  _selectedLocationName,
+                                  _selectedLat != null ? _selectedLocationName : (isArabic ? 'حدد موقعك على الخريطة' : 'Choose your location'),
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 16,
                                     color: _selectedLat != null ? Colors.black87 : Colors.black54,
+                                    fontFamily: isArabic ? 'NotoKufiArabic' : null,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -200,8 +242,14 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                       const SizedBox(height: 25),
 
                       // Sender Information & Change Option
-                      const Text('Sender Information',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Text(
+                        isArabic ? 'معلومات المرسل' : 'Sender Information',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 18,
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -218,16 +266,16 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                                       controller: _senderPhoneCtrl,
                                       keyboardType: TextInputType.phone,
                                       autofocus: true,
-                                      decoration: const InputDecoration(
-                                        hintText: 'Enter sender phone number',
+                                      decoration: InputDecoration(
+                                        hintText: isArabic ? 'أدخل رقم هاتف المرسل' : 'Enter sender phone number',
                                         border: InputBorder.none,
-                                        hintStyle: TextStyle(color: Colors.black38),
+                                        hintStyle: const TextStyle(color: Colors.black38),
                                       ),
                                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                                     )
                                   : Text(
                                       _senderPhoneCtrl.text.isEmpty
-                                          ? 'Your phone number'
+                                          ? (isArabic ? 'رقم هاتفك' : 'Your phone number')
                                           : _senderPhoneCtrl.text,
                                       style: TextStyle(
                                         fontSize: 16,
@@ -247,11 +295,12 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  _editingSenderPhone ? 'Save' : 'Change',
-                                  style: const TextStyle(
+                                  _editingSenderPhone ? (isArabic ? 'حفظ' : 'Save') : (isArabic ? 'تعديل' : 'Change'),
+                                  style: TextStyle(
                                     color: AppColors.primaryOrange,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
+                                    fontFamily: isArabic ? 'NotoKufiArabic' : null,
                                   ),
                                 ),
                               ),
@@ -285,7 +334,14 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
                       Navigator.push(context,
                           MaterialPageRoute(builder: (_) => const ParcelSummaryScreen()));
                     },
-                    child: const Text('Next', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                    child: Text(
+                      isArabic ? 'التالي' : 'Next', 
+                      style: TextStyle(
+                        fontSize: 20, 
+                        fontWeight: FontWeight.w900,
+                        fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -297,7 +353,7 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
     );
   }
 
-  Widget _buildActionButton(String label, VoidCallback onTap) {
+  Widget _buildActionButton(String label, VoidCallback onTap, [bool isArabic = false]) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -338,7 +394,7 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
     );
   }
 
-  Widget _buildDropdown(String hint, String? value, List<String> items, ValueChanged<String?> onChanged) {
+  Widget _buildDropdown(String hint, String? value, List<String> keys, List<String> labels, ValueChanged<String?> onChanged) {
     return Container(
       height: 55,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -355,12 +411,12 @@ class _ParcelSenderDetailScreenState extends State<ParcelSenderDetailScreen> {
           icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black, size: 28),
           style: const TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.w600),
           onChanged: onChanged,
-          items: items.map<DropdownMenuItem<String>>((String item) {
+          items: List.generate(keys.length, (i) {
             return DropdownMenuItem<String>(
-              value: item,
-              child: Text(item, style: const TextStyle(fontSize: 16)),
+              value: keys[i],
+              child: Text(labels[i], style: const TextStyle(fontSize: 16)),
             );
-          }).toList(),
+          }),
         ),
       ),
     );

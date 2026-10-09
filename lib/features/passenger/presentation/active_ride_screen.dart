@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -7,11 +9,16 @@ import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/socket_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/services/sound_service.dart';
 import '../../../core/providers/locale_provider.dart';
 import 'passenger_chat_screen.dart';
+import 'passenger_main_screen.dart';
 import 'trip_summary_screen.dart';
+import 'package:dio/dio.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ActiveRideScreen extends StatefulWidget {
   final dynamic rideData;
@@ -21,23 +28,198 @@ class ActiveRideScreen extends StatefulWidget {
   State<ActiveRideScreen> createState() => _ActiveRideScreenState();
 }
 
-class _ActiveRideScreenState extends State<ActiveRideScreen> {
-  LatLng _driverPos = const LatLng(33.3200, 44.3710);
+class _ActiveRideScreenState extends State<ActiveRideScreen>
+    with SingleTickerProviderStateMixin {
+  // ── Smooth marker interpolation & rotation (Uber-style) ──────────────
+  late LatLng _driverPos;
+  LatLng? _animFromPos;
+  LatLng? _animToPos;
+  AnimationController? _markerAnimCtrl;
+  Animation<double>? _markerAnim;
+  double _driverBearing = 0.0; // Heading in radians
+
+  // Smoothly interpolate between two LatLng points
+  LatLng _lerpLatLng(LatLng a, LatLng b, double t) {
+    return LatLng(
+      a.latitude + (b.latitude - a.latitude) * t,
+      a.longitude + (b.longitude - a.longitude) * t,
+    );
+  }
+
+  // Calculate angle between two points for realistic car orientation
+  double _calcBearing(LatLng from, LatLng to) {
+    final lat1 = from.latitude * (math.pi / 180.0);
+    final lon1 = from.longitude * (math.pi / 180.0);
+    final lat2 = to.latitude * (math.pi / 180.0);
+    final lon2 = to.longitude * (math.pi / 180.0);
+    final dLon = lon2 - lon1;
+    final y = math.sin(dLon) * math.cos(lat2);
+    final x = math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+    return math.atan2(y, x);
+  }
+
+  void _animateDriverTo(LatLng target) {
+    final from = _driverPos;
+    if ((from.latitude - target.latitude).abs() < 0.00001 &&
+        (from.longitude - target.longitude).abs() < 0.00001) return;
+
+    _animFromPos = from;
+    _animToPos = target;
+    _driverBearing = _calcBearing(from, target);
+
+    _markerAnimCtrl?.dispose();
+    _markerAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _markerAnim = CurvedAnimation(
+      parent: _markerAnimCtrl!,
+      curve: Curves.easeInOut,
+    );
+    _markerAnimCtrl!.addListener(() {
+      if (!mounted) return;
+      setState(() {
+        _driverPos = _lerpLatLng(_animFromPos!, _animToPos!, _markerAnim!.value);
+      });
+    });
+    _markerAnimCtrl!.forward();
+  }
+  // ─────────────────────────────────────────────────────────────────────
+
+  String _etaText = '';
+  String _distanceText = '';
   final MapController _mapController = MapController();
-  String _statusText = 'Driver is on the way';
+  String _statusText = '';
   bool _isCompletedNavigated = false;
+  List<LatLng> _routePoints = [];
+  bool _isTripInProgress = false;
+
+  late Map<String, dynamic> _rideData;
 
   @override
   void initState() {
     super.initState();
-    final socketService = Provider.of<SocketService>(context, listen: false);
     final dynamic raw = widget.rideData;
+    _rideData = raw is Map<String, dynamic>
+        ? Map.from(raw)
+        : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
+    // Use the last persisted GPS fix immediately when restoring an accepted ride.
+    final dynamic driver = _rideData['driver'];
+    final dynamic location = _rideData['driverLocation'] ??
+        (driver is Map ? driver['location'] : null);
+    final double initLat = (location is Map ? (location['lat'] as num?)?.toDouble() : null) ??
+        double.tryParse(_rideData['pickupLat']?.toString() ?? '') ?? 33.3412;
+    final double initLng = (location is Map ? (location['lng'] as num?)?.toDouble() : null) ??
+        double.tryParse(_rideData['pickupLng']?.toString() ?? '') ?? 44.4009;
+    _driverPos = LatLng(initLat, initLng);
+
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
+    _statusText = localeProvider.isArabic ? 'الكابتن في الطريق إليك' : 'Driver is on the way';
     final rideId = (raw is Map ? (raw['id'] ?? raw['rideId']) : null)?.toString();
     if (rideId != null && rideId.isNotEmpty) {
       socketService.joinRide(rideId);
     }
     _listenToSocketEvents();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchRoadRoute();
+      _fetchRideDetails();
+    });
   }
+
+  Future<void> _fetchRideDetails() async {
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final token = await storage.getToken();
+      if (token == null) return;
+
+      final res = await api.getActiveRide(token);
+      if (res.statusCode == 200 && res.data?['activeRide'] != null) {
+        if (mounted) {
+          setState(() {
+            _rideData.addAll(Map<String, dynamic>.from(res.data['activeRide']));
+            final ride = res.data['activeRide'];
+            final driver = ride is Map ? ride['driver'] : null;
+            final location = ride is Map ? (ride['driverLocation'] ?? (driver is Map ? driver['location'] : null)) : null;
+            if (location is Map && location['lat'] is num && location['lng'] is num) {
+              _driverPos = LatLng((location['lat'] as num).toDouble(), (location['lng'] as num).toDouble());
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching active ride details: $e');
+    }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> points = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+      points.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+    return points;
+  }
+
+  Future<void> _fetchRoadRoute() async {
+    final Map<String, dynamic> ride = _rideData;
+
+    final double pLat = double.tryParse(ride['pickupLat']?.toString() ?? '') ?? 33.3152;
+    final double pLng = double.tryParse(ride['pickupLng']?.toString() ?? '') ?? 44.3661;
+    final double dLat = double.tryParse(ride['dropLat']?.toString() ?? '') ?? 33.3300;
+    final double dLng = double.tryParse(ride['dropLng']?.toString() ?? '') ?? 44.3800;
+
+    final LatLng start = _isTripInProgress ? _driverPos : LatLng(pLat, pLng);
+    final LatLng dest = LatLng(dLat, dLng);
+
+    try {
+      final dio = Dio();
+      final url = 'https://api-yalla.aaaj.shop/api/map/directions?originLat=${start.latitude}&originLng=${start.longitude}&destLat=${dest.latitude}&destLng=${dest.longitude}';
+      final res = await dio.get(url, options: Options(receiveTimeout: const Duration(seconds: 4)));
+      if (res.statusCode == 200 && res.data != null && res.data['route'] != null) {
+        final ptsStr = res.data['route']['points'] ?? '';
+        if (ptsStr.isNotEmpty) {
+          final decoded = _decodePolyline(ptsStr);
+          if (decoded.isNotEmpty && mounted) {
+            setState(() {
+              _routePoints = decoded;
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Passenger Route] Note: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _routePoints = [start, dest];
+      });
+    }
+  }
+
 
   void _listenToSocketEvents() {
     final socketService = Provider.of<SocketService>(context, listen: false);
@@ -45,13 +227,33 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
     // Live driver moving coordinates
     socketService.onDriverMoved = (data) {
       if (!mounted) return;
+      if (data is Map && data['rideId'] != null &&
+          data['rideId'].toString() != (_rideData['id'] ?? _rideData['rideId']).toString()) return;
       if (data is Map && data['lat'] != null && data['lng'] != null) {
-        setState(() {
-          _driverPos = LatLng(
-            (data['lat'] as num).toDouble(),
-            (data['lng'] as num).toDouble(),
-          );
-        });
+        final newPos = LatLng(
+          (data['lat'] as num).toDouble(),
+          (data['lng'] as num).toDouble(),
+        );
+        // Smooth glide instead of jump
+        _animateDriverTo(newPos);
+        if (data['etaMinutes'] != null) {
+          final eta = (data['etaMinutes'] as num).toInt();
+          final loc = Provider.of<LocaleProvider>(context, listen: false);
+          setState(() {
+            _etaText = eta <= 1
+                ? (loc.isArabic ? 'يصل الآن' : 'Arriving now')
+                : (loc.isArabic ? 'الوصول: $eta دقيقة' : 'ETA: $eta min');
+          });
+        }
+        final distanceKm = (data['distanceToPickupKm'] as num?)?.toDouble();
+        if (distanceKm != null) {
+          final loc = Provider.of<LocaleProvider>(context, listen: false);
+          setState(() {
+            _distanceText = distanceKm < 1
+                ? '${(distanceKm * 1000).round()} m'
+                : '${distanceKm.toStringAsFixed(1)} km';
+          });
+        }
         try {
           _mapController.move(_driverPos, _mapController.camera.zoom);
         } catch (_) {}
@@ -68,8 +270,15 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
       setState(() {
         if (status == 'ARRIVED') {
           _statusText = isArabic ? 'وصل الكابتن إلى نقطة الانطلاق!' : 'Driver has arrived at pickup!';
+          SoundService().playRideAccepted();
+          // 🔔 Push Notification
+          NotificationService.notifyDriverArrived();
         } else if (status == 'PICKED_UP' || status == 'ONGOING') {
           _statusText = isArabic ? 'الرحلة قيد التنفيذ' : 'Trip in progress';
+          _isTripInProgress = true;
+          _fetchRoadRoute();
+          // 🔔 Push Notification
+          NotificationService.notifyTripStarted();
         } else if (status == 'COMPLETED') {
           _statusText = isArabic ? 'اكتملت الرحلة بنجاح!' : 'Trip Completed';
         }
@@ -77,6 +286,9 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
 
       if (status == 'COMPLETED' && !_isCompletedNavigated) {
         _isCompletedNavigated = true;
+        SoundService().playRideCompleted();
+        // 🔔 Push Notification
+        NotificationService.notifyTripCompleted();
         final finalPrice = (data['finalPrice'] as num?)?.toDouble();
         Navigator.pushReplacement(
           context,
@@ -88,53 +300,81 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
           ),
         );
       } else if (status == 'CANCELLED') {
-        _showCancelledNotice(data['reason']?.toString() ?? 'Ride was cancelled by driver');
+        SoundService().playRideCancelled();
+        // 🔔 Push Notification
+        NotificationService.notifyRideCancelled(reason: data['reason']?.toString());
+        _showCancelledNotice(data['reason']?.toString() ?? '');
       }
     };
 
     socketService.onRideCancelled = (data) {
       if (!mounted) return;
-      _showCancelledNotice(data['reason']?.toString() ?? 'Ride was cancelled');
+      SoundService().playRideCancelled();
+      // 🔔 Push Notification
+      NotificationService.notifyRideCancelled(reason: data['reason']?.toString());
+      _showCancelledNotice(data['reason']?.toString() ?? '');
     };
   }
 
   void _showCancelledNotice(String reason) {
     final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final isAr = locale.isArabic;
+    final displayReason = reason.isEmpty
+        ? (isAr ? 'تم الإلغاء من قِبل الكابتن' : 'Cancelled by driver')
+        : reason;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.cancel, color: Colors.red, size: 28),
-            const SizedBox(width: 8),
-            Text(locale.isArabic ? 'تم إلغاء الرحلة' : 'Ride Cancelled',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          locale.isArabic
-              ? 'نعتذر، تم إلغاء طلب الرحلة.\nالسبب: $reason'
-              : 'The ride was cancelled.\nReason: $reason',
-          style: const TextStyle(fontSize: 14),
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryOrange,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.of(context).popUntil((r) => r.isFirst);
-            },
-            child: Text(
-              locale.isArabic ? 'العودة للرئيسية' : 'Return Home',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      builder: (ctx) => Directionality(
+        textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.cancel, color: Colors.red, size: 28),
+              const SizedBox(width: 8),
+              Text(
+                isAr ? 'تم إلغاء الرحلة' : 'Ride Cancelled',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontFamily: isAr ? 'NotoKufiArabic' : null,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            isAr
+                ? 'نعتذر، تم إلغاء طلب الرحلة.\nالسبب: $displayReason'
+                : 'The ride was cancelled.\nReason: $displayReason',
+            style: TextStyle(
+              fontSize: 14,
+              fontFamily: isAr ? 'NotoKufiArabic' : null,
             ),
           ),
-        ],
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const PassengerMainScreen()),
+                  (route) => false,
+                );
+              },
+              child: Text(
+                isAr ? 'العودة للرئيسية' : 'Return Home',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: isAr ? 'NotoKufiArabic' : null,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -154,7 +394,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
+        builder: (modalCtx, setSheetState) => Container(
           padding: const EdgeInsets.all(24),
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -219,17 +459,26 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                         final api = Provider.of<ApiService>(context, listen: false);
                         final storage = Provider.of<StorageService>(context, listen: false);
                         final token = await storage.getToken();
-
-                        if (token != null) {
-                          try {
-                            await api.cancelRide(rideId, selectedReason, token);
-                          } catch (e) {
-                            debugPrint('Cancel ride note: $e');
+                        if (token == null) return;
+                        try {
+                          await api.cancelRide(rideId, selectedReason, token);
+                        } catch (e) {
+                          debugPrint('Cancel ride note: $e');
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Could not cancel the ride. Check your connection and retry.')),
+                            );
                           }
+                          return;
                         }
 
+                        SoundService().playRideCancelled();
+
                         if (mounted) {
-                          Navigator.of(context).popUntil((r) => r.isFirst);
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (_) => const PassengerMainScreen()),
+                            (route) => false,
+                          );
                         }
                       },
                       child: Text(
@@ -278,7 +527,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                 const Icon(Icons.shield_rounded, color: Colors.red, size: 28),
                 const SizedBox(width: 10),
                 Text(
-                  isArabic ? 'مركز الأمان والسلامة' : 'Safety & Emergency Toolkit',
+                  isArabic ? 'مركز الأمان والسلامة (SOS)' : 'Safety & Emergency Toolkit',
                   style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -286,48 +535,134 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
             const SizedBox(height: 8),
             Text(
               isArabic
-                  ? 'خطوط الطوارئ المعتمدة في جمهورية العراق:'
-                  : 'Emergency hotlines in the Republic of Iraq:',
+                  ? 'خطوط الطوارئ المعتمدة في العراق والمساعدة الفورية:'
+                  : 'Emergency hotlines in Iraq & live safety assistance:',
               style: GoogleFonts.inter(color: Colors.black54, fontSize: 13),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
+
+            // SOS Alert Yalla Dispatch Banner
+            InkWell(
+              onTap: () {
+                final socketService = Provider.of<SocketService>(context, listen: false);
+                socketService.socket?.emit('sos_alert', {
+                  'rideId': rideId,
+                  'driverName': driverName,
+                  'plate': plate,
+                  'lat': _driverPos.latitude,
+                  'lng': _driverPos.longitude,
+                  'timestamp': DateTime.now().toIso8601String(),
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: Colors.red.shade700,
+                    content: Text(
+                      isArabic
+                          ? '🚨 تم إرسال إشعار طوارئ SOS فوري إلى مركز عمليات يلا!'
+                          : '🚨 SOS Emergency Alert sent to Yalla operations center!',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade600,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: Colors.red.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isArabic ? 'إرسال إنذار طوارئ فوري (SOS)' : 'Send Live SOS Emergency Alert',
+                            style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          Text(
+                            isArabic ? 'يخطر فريق أمان يلا مع موقعك المباشر' : 'Alerts Yalla safety team with your live GPS',
+                            style: GoogleFonts.inter(color: Colors.white.withOpacity(0.85), fontSize: 11.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
             _buildEmergencyTile(
               icon: Icons.local_police_rounded,
               title: isArabic ? 'شرطة النجدة (104)' : 'Police Hotline (104)',
-              subtitle: isArabic ? 'اتصال فوري بالشرطة' : 'Direct emergency police line',
+              subtitle: isArabic ? 'اتصال فوري بشرطة النجدة العراقية' : 'Direct emergency police call',
               color: Colors.blue.shade800,
-              onTap: () {
-                Clipboard.setData(const ClipboardData(text: '104'));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(isArabic ? 'تم نسخ الرقم: 104' : 'Copied emergency number: 104')),
-                );
+              onTap: () async {
+                final uri = Uri.parse('tel:104');
+                try {
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  } else {
+                    Clipboard.setData(const ClipboardData(text: '104'));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isArabic ? 'تم نسخ الرقم: 104' : 'Copied emergency number: 104')),
+                    );
+                  }
+                } catch (_) {
+                  Clipboard.setData(const ClipboardData(text: '104'));
+                }
               },
             ),
             const SizedBox(height: 12),
             _buildEmergencyTile(
               icon: Icons.medical_services_rounded,
               title: isArabic ? 'الإسعاف الفوري (122)' : 'Medical Ambulance (122)',
-              subtitle: isArabic ? 'طوارئ الإسعاف الطبي' : 'Immediate medical rescue',
+              subtitle: isArabic ? 'اتصال فوري بالإسعاف الطبي' : 'Immediate medical ambulance call',
               color: Colors.red.shade700,
-              onTap: () {
-                Clipboard.setData(const ClipboardData(text: '122'));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(isArabic ? 'تم نسخ الرقم: 122' : 'Copied emergency number: 122')),
-                );
+              onTap: () async {
+                final uri = Uri.parse('tel:122');
+                try {
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  } else {
+                    Clipboard.setData(const ClipboardData(text: '122'));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isArabic ? 'تم نسخ الرقم: 122' : 'Copied emergency number: 122')),
+                    );
+                  }
+                } catch (_) {
+                  Clipboard.setData(const ClipboardData(text: '122'));
+                }
               },
             ),
             const SizedBox(height: 12),
             _buildEmergencyTile(
               icon: Icons.share_location_rounded,
-              title: isArabic ? 'مشاركة تفاصيل الرحلة' : 'Share Trip Details',
+              title: isArabic ? 'مشاركة الرحلة عبر واتساب' : 'Share Ride on WhatsApp',
               subtitle: 'Ride #$rideId • $driverName • $plate',
-              color: AppColors.primaryOrange,
-              onTap: () {
-                final tripSummary = 'Yalla Ride tracking: Captain $driverName, Plate: $plate, Ride ID: $rideId';
-                Clipboard.setData(ClipboardData(text: tripSummary));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(isArabic ? 'تم نسخ تفاصيل الرحلة للحافظة' : 'Copied trip info to clipboard')),
-                );
+              color: const Color(0xFF25D366),
+              onTap: () async {
+                final shareText = isArabic
+                    ? 'أنا في رحلة مع يلا!\nالكابتن: $driverName\nرقم اللوحة: $plate\nمعرف الرحلة: #$rideId'
+                    : 'I am on a Yalla ride!\nDriver: $driverName\nPlate: $plate\nRide ID: #$rideId';
+                Clipboard.setData(ClipboardData(text: shareText));
+                final waUri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(shareText)}');
+                try {
+                  await launchUrl(waUri, mode: LaunchMode.externalApplication);
+                } catch (_) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(isArabic ? 'تم نسخ تفاصيل الرحلة للحافظة' : 'Copied trip info to clipboard')),
+                  );
+                }
                 Navigator.pop(ctx);
               },
             ),
@@ -428,6 +763,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
 
   @override
   void dispose() {
+    _markerAnimCtrl?.dispose();
     final socketService = Provider.of<SocketService>(context, listen: false);
     socketService.onDriverMoved = null;
     socketService.onRideStatusUpdate = null;
@@ -440,10 +776,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
     final locale = Provider.of<LocaleProvider>(context);
     final isArabic = locale.isArabic;
 
-    final dynamic rawRide = widget.rideData;
-    final Map<String, dynamic> ride = rawRide is Map<String, dynamic>
-        ? rawRide
-        : (rawRide is Map ? Map<String, dynamic>.from(rawRide) : <String, dynamic>{});
+    final Map<String, dynamic> ride = _rideData;
 
     final rideId = (ride['id'] ?? ride['rideId'] ?? '').toString();
     final otpCode = (ride['otp'] ?? '----').toString();
@@ -468,11 +801,15 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
         (vehicle != null ? "${vehicle['make'] ?? ''} ${vehicle['model'] ?? ''}".trim() : 'Toyota Camry');
     final plate = ride['plate'] ??
         (vehicle != null ? "${vehicle['licensePlate'] ?? ''}".trim() : 'Baghdad 12345');
+    final driverPhoto = ride['driverPhoto'] ?? driver?['profileImage'];
+    final hasDriverPhoto = driverPhoto is String && driverPhoto.isNotEmpty;
+    final driverRating = ride['rating'] ?? driver?['rating'] ?? '5.0';
+    final vehicleColor = ride['vehicleColor'] ?? vehicle?['color'];
 
-    final pickupLat = (ride['pickupLat'] as num?)?.toDouble() ?? 33.3152;
-    final pickupLng = (ride['pickupLng'] as num?)?.toDouble() ?? 44.3661;
-    final dropLat = (ride['dropLat'] as num?)?.toDouble() ?? 33.3300;
-    final dropLng = (ride['dropLng'] as num?)?.toDouble() ?? 44.3800;
+    final double pickupLat = double.tryParse(ride['pickupLat']?.toString() ?? '') ?? 33.3152;
+    final double pickupLng = double.tryParse(ride['pickupLng']?.toString() ?? '') ?? 44.3661;
+    final double dropLat = double.tryParse(ride['dropLat']?.toString() ?? '') ?? 33.3300;
+    final double dropLng = double.tryParse(ride['dropLng']?.toString() ?? '') ?? 44.3800;
 
     return Scaffold(
       body: Stack(
@@ -490,9 +827,11 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: [LatLng(pickupLat, pickupLng), _driverPos, LatLng(dropLat, dropLng)],
+                    points: _routePoints.isNotEmpty
+                        ? _routePoints
+                        : [LatLng(pickupLat, pickupLng), _driverPos, LatLng(dropLat, dropLng)],
                     color: AppColors.primaryOrange,
-                    strokeWidth: 4,
+                    strokeWidth: 5,
                   ),
                 ],
               ),
@@ -514,8 +853,11 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 3))],
                       ),
-                      child: const Center(
-                        child: Icon(Icons.directions_car, color: AppColors.primaryOrange, size: 30),
+                      child: Center(
+                        child: Transform.rotate(
+                          angle: _driverBearing,
+                          child: const Icon(Icons.navigation_rounded, color: AppColors.primaryOrange, size: 30),
+                        ),
                       ),
                     ),
                   ),
@@ -554,6 +896,24 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                         _statusText,
                         style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
+                      if (_etaText.isNotEmpty) ...[
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryOrange,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _etaText,
+                            style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                      if (_distanceText.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(_distanceText, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                      ],
                     ],
                   ),
                 ),
@@ -639,7 +999,12 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                         CircleAvatar(
                           radius: 26,
                           backgroundColor: AppColors.primaryOrange.withOpacity(0.15),
-                          child: const Icon(Icons.person, color: AppColors.primaryOrange, size: 30),
+                          backgroundImage: hasDriverPhoto
+                              ? NetworkImage(driverPhoto)
+                              : null,
+                          child: hasDriverPhoto
+                              ? null
+                              : const Icon(Icons.person, color: AppColors.primaryOrange, size: 30),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -651,7 +1016,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
                                 style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 17),
                               ),
                               Text(
-                                carModel,
+                                [carModel, vehicleColor, '★ $driverRating'].where((value) => value != null && value.toString().isNotEmpty).join(' · '),
                                 style: GoogleFonts.inter(color: Colors.black54, fontSize: 12.5),
                               ),
                             ],

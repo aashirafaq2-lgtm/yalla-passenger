@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/services/storage_service.dart';
 import 'map_selection_screen.dart';
 import 'book_entire_car_success_screen.dart';
+
+import '../../../core/providers/locale_provider.dart';
 
 class BookEntireCarScreen extends StatefulWidget {
   const BookEntireCarScreen({super.key});
@@ -12,11 +18,8 @@ class BookEntireCarScreen extends StatefulWidget {
 }
 
 class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
-  bool isInternational = false;
   String selectedOrigin = 'Kirkuk';
-  String selectedDestination = 'Bagdad';
-  String selectedCountryOrigin = 'IRAQ';
-  String selectedCountryDest = 'QATAR';
+  String selectedDestination = 'Baghdad';
   String selectedCarType = 'Dodge Charger';
   String selectedDate = '14/2/2026';
   String selectedTime = '2:00 PM';
@@ -37,8 +40,25 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
     super.dispose();
   }
 
-  final List<String> cities = ['Kirkuk', 'Bagdad', 'Erbil', 'Basra', 'Najaf', 'Karbala', 'Mosul'];
-  final List<String> countries = ['IRAQ', 'QATAR', 'UAE', 'SAUDI ARABIA', 'JORDAN'];
+  final List<String> cities = [
+    'Kirkuk',
+    'Baghdad',
+    'Erbil',
+    'Basra',
+    'Najaf',
+    'Karbala',
+    'Mosul',
+    'Sulaymaniyah',
+    'Duhok',
+    'Nasiriyah',
+    'Amarah',
+    'Samawah',
+    'Hillah',
+    'Kut',
+    'Diwaniyah',
+    'Ramadi',
+    'Baqubah'
+  ];
   final List<String> carTypes = ['Dodge Charger', 'Toyota Camry', 'Hyundai Sonata', 'Ford Taurus'];
 
   Future<void> _selectDate(BuildContext context) async {
@@ -81,6 +101,9 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -99,15 +122,19 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                         border: Border.all(color: Colors.black12),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Center(
                         child: Text(
-                          'Book the entire car',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          isArabic ? 'حجز سيارة كاملة' : 'Book the entire car',
+                          style: TextStyle(
+                            fontSize: 22, 
+                            fontWeight: FontWeight.bold,
+                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          ),
                         ),
                       ),
                     ),
@@ -129,9 +156,9 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                   ),
                   child: Row(
                     children: [
-                      Expanded(child: _buildDateTimeCard('Choose date', selectedDate, () => _selectDate(context))),
+                      Expanded(child: _buildDateTimeCard(isArabic ? 'اختر التاريخ' : 'Choose date', selectedDate, () => _selectDate(context), isArabic)),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildDateTimeCard('Choose time', selectedTime, () => _selectTime(context))),
+                      Expanded(child: _buildDateTimeCard(isArabic ? 'اختر الوقت' : 'Choose time', selectedTime, () => _selectTime(context), isArabic)),
                     ],
                   ),
                 ),
@@ -151,26 +178,22 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                   ),
                   child: Column(
                     children: [
-                      if (!isInternational) ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildCityBadge(selectedOrigin, cities, (val) => setState(() => selectedOrigin = val!)),
-                            const Icon(Icons.arrow_right_alt, size: 30),
-                            _buildCityBadge(selectedDestination, cities, (val) => setState(() => selectedDestination = val!)),
-                          ],
-                        ),
-                      ] else ...[
-                         _buildCountryFlow(),
-                      ],
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildCityBadge(selectedOrigin, cities, (val) => setState(() => selectedOrigin = val!)),
+                          Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
+                          _buildCityBadge(selectedDestination, cities, (val) => setState(() => selectedDestination = val!)),
+                        ],
+                      ),
                       const SizedBox(height: 15),
                       // Info Row
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildInfoItem(Icons.accessible_forward, '4', 'Seats'),
-                          _buildInfoItem(Icons.access_time, selectedTime, 'Time'),
-                          _buildInfoItem(Icons.calendar_month, selectedDate, 'Date'),
+                          _buildInfoItem(Icons.accessible_forward, '4', isArabic ? 'مقاعد' : 'Seats'),
+                          _buildInfoItem(Icons.access_time, selectedTime, isArabic ? 'الوقت' : 'Time'),
+                          _buildInfoItem(Icons.calendar_month, selectedDate, isArabic ? 'التاريخ' : 'Date'),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -178,17 +201,17 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildDetailItem('Price', isInternational ? '100 USD' : '75,000 IQD'),
-                          _buildDetailItem('Car', isInternational ? 'Ford' : 'Dodge Charger', isRight: true, icon: Icons.directions_car),
+                          _buildDetailItem(isArabic ? 'السعر' : 'Price', isArabic ? '75,000 د.ع' : '75,000 IQD'),
+                          _buildDetailItem(isArabic ? 'السيارة' : 'Car', selectedCarType, isRight: true, icon: Icons.directions_car),
                         ],
                       ),
                       const SizedBox(height: 20),
                       // Location Buttons
                       Row(
                         children: [
-                          Expanded(child: _buildSmallActionButton('Choose starting point', () => _openMap())),
+                          Expanded(child: _buildSmallActionButton(isArabic ? 'نقطة الانطلاق' : 'Choose starting point', () => _openMap(), isArabic)),
                           const SizedBox(width: 12),
-                          Expanded(child: _buildSmallActionButton('Choose destination', () => _openMap())),
+                          Expanded(child: _buildSmallActionButton(isArabic ? 'نقطة الوصول' : 'Choose destination', () => _openMap(), isArabic)),
                         ],
                       ),
                     ],
@@ -219,8 +242,8 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                         ),
                         child: TextField(
                           controller: _discountCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'Discount code',
+                          decoration: InputDecoration(
+                            hintText: isArabic ? 'كود الخصم' : 'Discount code',
                             border: InputBorder.none,
                           ),
                         ),
@@ -239,9 +262,9 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                           elevation: 0,
                         ),
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid discount code')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isArabic ? 'كود الخصم غير صالح' : 'Invalid discount code')));
                         },
-                        child: const Text('Apply'),
+                        child: Text(isArabic ? 'تطبيق' : 'Apply'),
                       ),
                     ),
                   ],
@@ -265,17 +288,19 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                       side: const BorderSide(color: Colors.black12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
                     ),
-                    onPressed: () {
-                      if (!isInternational) {
-                        setState(() => isInternational = true);
-                      } else {
-                        _showSuccess();
-                      }
-                    },
-                    child: Text(
-                      isInternational ? 'Submit' : 'Next',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                    ),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => _submitBooking(),
+                    child: _isSubmitting
+                        ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primaryOrange)))
+                        : Text(
+                            isArabic ? 'إرسال' : 'Submit',
+                            style: TextStyle(
+                              fontSize: 20, 
+                              fontWeight: FontWeight.w900,
+                              fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -291,12 +316,61 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const MapSelectionScreen()));
   }
 
+  bool _isSubmitting = false;
+
+  Future<void> _submitBooking() async {
+    setState(() => _isSubmitting = true);
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final isArabic = locale.isArabic;
+
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final api = Provider.of<ApiService>(context, listen: false);
+      final token = await storage.getToken();
+
+      final res = await api.dio.post(
+        '/bookings/create',
+        data: {
+          'type': 'PRIVATE_CAR',
+          'pickupName': selectedOrigin,
+          'dropName': selectedDestination,
+          'totalPrice': 75000,
+          'carType': selectedCarType,
+          'date': selectedDate,
+          'time': selectedTime,
+        },
+        options: token != null && token.isNotEmpty ? Options(headers: {'Authorization': 'Bearer $token'}) : null,
+      );
+
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        if (res.statusCode == 200 || res.statusCode == 201) {
+          _showSuccess();
+        } else {
+          final msg = res.data?['error'] ?? (isArabic ? 'حدث خطأ أثناء إتمام الحجز' : 'Failed to create booking');
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg.toString())));
+        }
+      }
+    } catch (e) {
+      debugPrint('Book entire car dispatch note: $e');
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isArabic ? 'تعذر إرسال الحجز، يرجى التحقق من الاتصال والمحاولة ثانية' : 'Could not complete booking, please try again.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   void _showSuccess() {
-    // Navigate to success screen (reusing ScheduleSuccessScreen logic for now or creating a new one)
     Navigator.push(context, MaterialPageRoute(builder: (_) => const BookEntireCarSuccessScreen()));
   }
 
-  Widget _buildDateTimeCard(String label, String value, VoidCallback onTap) {
+  Widget _buildDateTimeCard(String label, String value, VoidCallback onTap, [bool isArabic = false]) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -308,7 +382,15 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
         ),
         child: Column(
           children: [
-            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              label, 
+              style: TextStyle(
+                color: Colors.white, 
+                fontWeight: FontWeight.bold, 
+                fontSize: 16,
+                fontFamily: isArabic ? 'NotoKufiArabic' : null,
+              ),
+            ),
             const SizedBox(height: 2),
             Text(value, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
           ],
@@ -343,17 +425,7 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
     );
   }
 
-  Widget _buildCountryFlow() {
-    return Column(
-      children: [
-        _buildCityBadge(selectedCountryOrigin, countries, (val) => setState(() => selectedCountryOrigin = val!)),
-        const Icon(Icons.arrow_downward, size: 30),
-        _buildCityBadge(selectedCountryDest, countries, (val) => setState(() => selectedCountryDest = val!)),
-      ],
-    );
-  }
-
-  Widget _buildSmallActionButton(String label, VoidCallback onTap) {
+  Widget _buildSmallActionButton(String label, VoidCallback onTap, [bool isArabic = false]) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -366,7 +438,12 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
         child: Center(
           child: Text(
             label,
-            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.white, 
+              fontSize: 14, 
+              fontWeight: FontWeight.bold,
+              fontFamily: isArabic ? 'NotoKufiArabic' : null,
+            ),
           ),
         ),
       ),

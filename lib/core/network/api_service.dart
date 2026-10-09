@@ -9,12 +9,13 @@ class ApiService {
     dio = Dio(
       BaseOptions(
         baseUrl: 'https://api-yalla.aaaj.shop/api',
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        validateStatus: (status) => true,
       ),
     );
 
@@ -29,14 +30,29 @@ class ApiService {
         return handler.next(options);
       },
     ));
-
-    dio.interceptors.add(LogInterceptor(responseBody: true, requestBody: true));
   }
+
+  /// Helper: returns Dio Options with Authorization header
+  Options authOptions(String token) =>
+      Options(headers: {'Authorization': 'Bearer $token'});
 
   // Auth
   Future<Response> login(String phone) async {
     return await dio.post('/auth/login', data: {
       'phone': phone,
+      'role': 'PASSENGER',
+    });
+  }
+
+  Future<Response> registerPassenger({
+    required String phone,
+    required String name,
+    String? age,
+  }) async {
+    return await dio.post('/auth/register-passenger', data: {
+      'phone': phone,
+      'name': name,
+      'age': age,
       'role': 'PASSENGER',
     });
   }
@@ -67,7 +83,7 @@ class ApiService {
   }
 
   Future<Response> updateFcmToken(String fcmToken, String token) async {
-    return await dio.patch('/user/fcm-token', data: {'fcmToken': fcmToken}, options: Options(headers: {'Authorization': 'Bearer $token'}));
+    return await dio.patch('/user/device-token', data: {'deviceToken': fcmToken}, options: Options(headers: {'Authorization': 'Bearer $token'}));
   }
 
   // Trips
@@ -80,7 +96,11 @@ class ApiService {
   }
 
   Future<Response> requestParcel(Map<String, dynamic> data, String token) async {
-    return await dio.post('/parcel/request', data: data, options: Options(headers: {'Authorization': 'Bearer $token'}));
+    return await dio.post('/parcels/request', data: data, options: Options(headers: {'Authorization': 'Bearer $token'}));
+  }
+
+  Future<Response> getMyBookings(String token) async {
+    return await dio.get('/bookings/my', options: Options(headers: {'Authorization': 'Bearer $token'}));
   }
 
   // Reviews
@@ -112,10 +132,22 @@ class ApiService {
     return await dio.get('/ride/active', options: Options(headers: {'Authorization': 'Bearer $token'}));
   }
 
+  Future<Response> getRide(String rideId, String token) async {
+    return await dio.get('/ride/$rideId', options: Options(headers: {'Authorization': 'Bearer $token'}));
+  }
+
   Future<Response> cancelRide(String rideId, String reason, String token) async {
     return await dio.patch(
       '/ride/cancel',
       data: {'rideId': rideId, 'reason': reason},
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+  }
+
+  Future<Response> requestRide(Map<String, dynamic> data, String token) async {
+    return await dio.post(
+      '/ride/request',
+      data: data,
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
   }
@@ -166,5 +198,39 @@ class ApiService {
   Future<Response> markNotificationsRead(String token) async {
     return await dio.patch('/user/notifications/mark-read', options: Options(headers: {'Authorization': 'Bearer $token'}));
   }
-}
 
+  Future<Response> validatePromo(String code, String? token) async {
+    return await dio.post(
+      '/ride/validate-promo',
+      data: {'code': code},
+      options: token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null,
+    );
+  }
+
+  Future<Response> topUpWallet(String code, String token) async {
+    return await dio.post(
+      '/user/wallet/topup',
+      data: {'code': code},
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+  }
+
+  /// Resolve a Google Places placeId to lat/lng, name, and address
+  Future<Response> getPlaceDetails(String placeId) async {
+    return await dio.get('/map/place-details', queryParameters: {
+      'placeId': placeId,
+    });
+  }
+
+  Future<Response> updateRideStatus(String rideId, String status, String token, {double? finalPrice}) async {
+    return await dio.patch(
+      '/ride/status',
+      data: {
+        'rideId': rideId,
+        'status': status,
+        if (finalPrice != null) 'finalPrice': finalPrice,
+      },
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+  }
+}

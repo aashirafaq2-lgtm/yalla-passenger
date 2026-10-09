@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'parcel_success_screen.dart';
 
 class ParcelSummaryScreen extends StatelessWidget {
@@ -10,6 +12,9 @@ class ParcelSummaryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -28,11 +33,23 @@ class ParcelSummaryScreen extends StatelessWidget {
                         border: Border.all(color: Colors.black12),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    const Spacer(),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          isArabic ? 'ملخص الشحنة' : 'Parcel Summary',
+                          style: TextStyle(
+                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                            fontSize: 20, 
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
                   ],
                 ),
               ),
@@ -66,8 +83,14 @@ class ParcelSummaryScreen extends StatelessWidget {
 
               // Sender Card
               _buildSummaryCard(
-                title: 'Sender',
-                details: {
+                title: isArabic ? 'بيانات المرسل' : 'Sender',
+                details: isArabic ? {
+                  'الاسم': 'المرسل',
+                  'رقم الهاتف': '0770-123-1234',
+                  'المحافظة': 'كركوك',
+                  'المنطقة': 'طريق بغداد',
+                  'التاريخ والوقت': '2026-02-17 2:00 ص',
+                } : {
                   'Name': 'Sender',
                   'Phone number': '0770-123-1234',
                   'governorate': 'Kirkuk',
@@ -75,13 +98,20 @@ class ParcelSummaryScreen extends StatelessWidget {
                   'Date & time': '2026-02-17 2:00 AM',
                 },
                 index: 0,
+                isArabic: isArabic,
               ),
               const SizedBox(height: 20),
 
               // Recipient Card
               _buildSummaryCard(
-                title: 'Recipient',
-                details: {
+                title: isArabic ? 'بيانات المستلم' : 'Recipient',
+                details: isArabic ? {
+                  'الاسم': 'أحمد',
+                  'رقم الهاتف': '0770-123-1234',
+                  'المحافظة': 'بغداد',
+                  'المنطقة': 'الأعظمية',
+                  'التاريخ والوقت': '2026-02-17 2:00 ص',
+                } : {
                   'Name': 'Ahmed',
                   'Phone number': '0770-123-1234',
                   'governorate': 'Baghdad',
@@ -89,6 +119,7 @@ class ParcelSummaryScreen extends StatelessWidget {
                   'Date & time': '2026-02-17 2:00 AM',
                 },
                 index: 1,
+                isArabic: isArabic,
               ),
               const SizedBox(height: 20),
 
@@ -105,12 +136,22 @@ class ParcelSummaryScreen extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      _buildDetailRow('Delivery price', '10,000 IQD'),
+                      _buildDetailRow(
+                        isArabic ? 'سعر التوصيل' : 'Delivery price', 
+                        isArabic ? '١٠,٠٠٠ د.ع' : '10,000 IQD'
+                      ),
                       const SizedBox(height: 15),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Payment method', style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black54)),
+                          Text(
+                            isArabic ? 'طريقة الدفع' : 'Payment method', 
+                            style: TextStyle(
+                              fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                              fontWeight: FontWeight.w500, 
+                              color: Colors.black54
+                            )
+                          ),
                           Row(
                             children: [
                                _buildCompactCardIcon('assets/images/cash_icon.png'),
@@ -123,7 +164,11 @@ class ParcelSummaryScreen extends StatelessWidget {
                         ],
                       ),
                       const Divider(height: 40),
-                      _buildDetailRow('Total', '10,000 IQD', isTotal: true),
+                      _buildDetailRow(
+                        isArabic ? 'الإجمالي' : 'Total', 
+                        isArabic ? '١٠,٠٠٠ د.ع' : '10,000 IQD', 
+                        isTotal: true
+                      ),
                     ],
                   ),
                 ),
@@ -148,7 +193,6 @@ class ParcelSummaryScreen extends StatelessWidget {
                     ),
                     onPressed: () async {
                       try {
-                        // Call backend API endpoint for parcel creation
                         await ApiService().requestParcel({
                           'type': 'PARCEL',
                           'status': 'PENDING',
@@ -160,7 +204,14 @@ class ParcelSummaryScreen extends StatelessWidget {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const ParcelSuccessScreen()));
                       }
                     },
-                    child: const Text('Create mail Requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                    child: Text(
+                      isArabic ? 'إرسال طلب الشحنة' : 'Create mail Requests', 
+                      style: TextStyle(
+                        fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                        fontSize: 18, 
+                        fontWeight: FontWeight.w900
+                      )
+                    ),
                   ),
                 ),
               ),
@@ -172,7 +223,12 @@ class ParcelSummaryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryCard({required String title, required Map<String, String> details, required int index}) {
+  Widget _buildSummaryCard({
+    required String title, 
+    required Map<String, String> details, 
+    required int index,
+    required bool isArabic,
+  }) {
     return FadeInUp(
       delay: Duration(milliseconds: 200 * index),
       child: Container(
@@ -184,16 +240,30 @@ class ParcelSummaryScreen extends StatelessWidget {
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(
+              title, 
+              style: TextStyle(
+                fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                fontSize: 20, 
+                fontWeight: FontWeight.bold
+              )
+            ),
             const Divider(height: 25),
             ...details.entries.map((e) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(e.key, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w500)),
+                      Text(
+                        e.key, 
+                        style: TextStyle(
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          color: Colors.black54, 
+                          fontWeight: FontWeight.w500
+                        )
+                      ),
                       Text(e.value, style: const TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),

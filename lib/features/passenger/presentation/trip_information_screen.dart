@@ -1,22 +1,123 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
-import 'active_ride_screen.dart';
+import '../../../core/providers/locale_provider.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/services/storage_service.dart';
+import '../../../core/services/notification_service.dart';
+import 'schedule_success_screen.dart';
 
-class TripInformationScreen extends StatelessWidget {
+class TripInformationScreen extends StatefulWidget {
   final dynamic rideData;
   const TripInformationScreen({super.key, this.rideData});
 
   @override
+  State<TripInformationScreen> createState() => _TripInformationScreenState();
+}
+
+class _TripInformationScreenState extends State<TripInformationScreen> {
+  bool _isBooking = false;
+
+  Future<void> _confirmBooking() async {
+    if (_isBooking) return;
+    setState(() => _isBooking = true);
+
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final token = await storage.getToken();
+
+      if (token == null) {
+        if (mounted) setState(() => _isBooking = false);
+        return;
+      }
+
+      final tripId = widget.rideData?['tripId'];
+      final seats = widget.rideData?['seats'] ?? 1;
+      final price = widget.rideData?['price'];
+
+      final response = await api.dio.post(
+        '/bookings/create',
+        data: {
+          'type': tripId != null ? 'SCHEDULED_SEAT' : 'PRIVATE_CAR',
+          'tripId': tripId,
+          'seatsBooked': seats,
+          'totalPrice': price != null ? int.tryParse(price.toString()) : null,
+          'from': widget.rideData?['from'] ?? '',
+          'to': widget.rideData?['to'] ?? '',
+          'pickupName': widget.rideData?['from'] ?? 'Pickup',
+          'dropName': widget.rideData?['to'] ?? 'Destination',
+          'fromGovernorateId': widget.rideData?['fromGovernorateId'],
+          'toGovernorateId': widget.rideData?['toGovernorateId'],
+        },
+        options: api.authOptions(token),
+      );
+
+      if (mounted) setState(() => _isBooking = false);
+
+      if (response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 300) {
+        final rideResp = response.data['ride'] ?? response.data['booking'];
+        if (rideResp != null && rideResp['id'] != null && rideResp['departureTime'] != null) {
+          try {
+            final dt = DateTime.parse(rideResp['departureTime'].toString());
+            NotificationService.scheduleRideReminders(dt, rideResp['id'].toString());
+          } catch (_) {}
+        }
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ScheduleSuccessScreen(
+                from: rideResp?['from'] ?? widget.rideData?['from'] ?? '',
+                to: rideResp?['to'] ?? widget.rideData?['to'] ?? '',
+                driverName: rideResp?['driverName'] ?? widget.rideData?['driverName'] ?? '',
+                totalPrice: rideResp?['totalPrice']?.toString() ?? price?.toString() ?? '',
+                departureTime: rideResp?['departureTime'],
+              ),
+            ),
+          );
+        }
+      } else {
+        final err = response.data?['error'] ?? 'Booking failed. Please try again.';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(err), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[TripInfo] Booking error: $e');
+      if (mounted) {
+        setState(() => _isBooking = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Connection error. Please try again.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final String driverName = rideData?['driverName'] ?? 'Assigned Driver';
-    final String carModel   = rideData?['carModel']   ?? '--';
-    final String plate      = rideData?['plate']      ?? '---';
-    final String from       = rideData?['from']       ?? 'Pickup';
-    final String to         = rideData?['to']         ?? 'Drop-off';
-    final String price      = rideData?['price'] != null
-        ? '${rideData!['price']} IQD' : '75,000 IQD';
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
+
+    final String driverName = widget.rideData?['driverName'] ?? (isArabic ? 'كابتن الرحلة' : 'Assigned Driver');
+    final String carModel   = widget.rideData?['carModel']   ?? '--';
+    final String plate      = widget.rideData?['plate']      ?? '---';
+    final String from       = widget.rideData?['from']       ?? (isArabic ? 'نقطة الانطلاق' : 'Pickup');
+    final String to         = widget.rideData?['to']         ?? (isArabic ? 'وجهة الوصول' : 'Drop-off');
+    final int seats         = widget.rideData?['seats'] ?? 1;
+    final bool frontSeat    = widget.rideData?['frontSeat'] ?? false;
+    final String rawPrice   = widget.rideData?['price']?.toString() ?? '25000';
+    final int priceNum      = int.tryParse(rawPrice) ?? 25000;
+    final String priceStr   = '$priceNum ${isArabic ? "د.ع" : "IQD"}';
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -35,15 +136,19 @@ class TripInformationScreen extends StatelessWidget {
                         border: Border.all(color: Colors.black12),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Center(
                         child: Text(
-                          'Trip Information',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          isArabic ? 'تأكيد الحجز' : 'Confirm Booking',
+                          style: TextStyle(
+                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                            fontSize: 22, 
+                            fontWeight: FontWeight.bold
+                          ),
                         ),
                       ),
                     ),
@@ -51,9 +156,9 @@ class TripInformationScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
 
-              // Main Trip Card — Figure 2 layout
+              // Trip Card
               FadeInUp(
                 child: Container(
                   padding: const EdgeInsets.all(20),
@@ -72,55 +177,32 @@ class TripInformationScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildCityBadge(from),
-                          const Icon(Icons.arrow_right_alt, size: 30),
+                          Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
                           _buildCityBadge(to),
                         ],
                       ),
                       const SizedBox(height: 20),
-                      // Info row — seats | time | date
+                      // Info row
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildInfoItem(Icons.accessible_forward, '4', 'Seats'),
-                          _buildInfoItem(Icons.access_time, '2:00 PM', 'Time'),
-                          _buildInfoItem(Icons.calendar_month_outlined, '14/2/2026', 'Date'),
+                          _buildInfoItem(Icons.event_seat_outlined, seats.toString(), isArabic ? 'المقاعد' : 'Seats'),
+                          _buildInfoItem(Icons.monetization_on_outlined, priceStr, isArabic ? 'المجموع' : 'Total'),
+                          _buildInfoItem(Icons.check_circle_outline, isArabic ? 'مؤكد' : 'Confirmed', isArabic ? 'الحالة' : 'Status'),
                         ],
                       ),
                       const SizedBox(height: 20),
-                      // Price and Car model
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text(price, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Icon(Icons.directions_car, size: 28, color: Colors.black54),
-                              Text(carModel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      // License Plate & Driver row — Figure 2 detail
+                      // Driver + plate
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
-                              const Text('Driver', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black54)),
+                              Text(isArabic ? 'الكابتن' : 'Driver', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black54)),
                               Text(driverName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             ],
                           ),
-                          // Iraqi License Plate visual widget
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                             decoration: BoxDecoration(
@@ -140,46 +222,11 @@ class TripInformationScreen extends StatelessWidget {
                                     color: AppColors.primaryOrange,
                                     borderRadius: BorderRadius.all(Radius.circular(4)),
                                   ),
-                                  child: const Text('IRAQ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                                  child: Text(isArabic ? 'العراق' : 'IRAQ', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
                                 ),
                                 const SizedBox(width: 10),
                                 Text(plate == '---' ? '١٢٣٤٥' : plate, style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2)),
                               ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      // Two orange action buttons — Figure 2
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryOrange,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                              ),
-                              onPressed: () {},
-                              child: const Text('Choose starting point',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryOrange,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                              ),
-                              onPressed: () {},
-                              child: const Text('Choose destination',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                             ),
                           ),
                         ],
@@ -189,90 +236,111 @@ class TripInformationScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 30),
 
-              // Details Section
+              // Price Breakdown
               FadeInUp(
                 delay: const Duration(milliseconds: 200),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Details',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.black12),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.black12),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isArabic ? 'تفاصيل السعر' : 'Price Details',
+                        style: TextStyle(fontFamily: isArabic ? 'NotoKufiArabic' : null, fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      child: Column(
-                        children: [
-                          _buildPriceRow('1x seat', '75,000 IQD'),
-                          const SizedBox(height: 12),
-                          _buildPriceRow('Front seat', 'No'),
-                          const SizedBox(height: 12),
-                          _buildPriceRow('Discount', '5,000'),
-                          const Divider(height: 30),
-                          _buildPriceRow('Total', '70,0000 IQD', isTotal: true), // Kept "70,0000" as per design typo
-                        ],
+                      const SizedBox(height: 16),
+                      _buildPriceRow(
+                        isArabic ? '$seats × مقعد' : '$seats × seat',
+                        '${seats * 25000} ${isArabic ? "د.ع" : "IQD"}',
                       ),
-                    ),
-                  ],
+                      if (frontSeat) ...[
+                        const SizedBox(height: 10),
+                        _buildPriceRow(
+                          isArabic ? 'المقعد الأمامي' : 'Front seat',
+                          '5,000 ${isArabic ? "د.ع" : "IQD"}',
+                        ),
+                      ],
+                      const Divider(height: 30),
+                      _buildPriceRow(
+                        isArabic ? 'الإجمالي' : 'Total',
+                        priceStr,
+                        isTotal: true,
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
               const SizedBox(height: 40),
 
-              // Buttons
+              // Confirm Button
               FadeInUp(
                 delay: const Duration(milliseconds: 400),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 65,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          elevation: 8,
-                          shadowColor: Colors.black26,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
-                          side: const BorderSide(color: Colors.black12),
-                        ),
-                        onPressed: () {
-                          Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => ActiveRideScreen(rideData: rideData ?? {
-                              'driverName': driverName,
-                              'carModel': carModel,
-                              'plate': plate,
-                              'from': from,
-                              'to': to,
-                            }),
-                          ));
-                        },
-                        child: const Text('Confirm your reservation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 65,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryOrange,
+                      foregroundColor: Colors.white,
+                      elevation: 8,
+                      shadowColor: AppColors.primaryOrange.withOpacity(0.4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
+                    ),
+                    onPressed: _isBooking ? null : _confirmBooking,
+                    child: _isBooking
+                        ? const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+                              SizedBox(width: 12),
+                              Text('Booking...', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                            ],
+                          )
+                        : Text(
+                            isArabic ? 'تأكيد الحجز' : 'Confirm Booking',
+                            style: TextStyle(
+                              fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Cancel Button
+              FadeInUp(
+                delay: const Duration(milliseconds: 500),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.black12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      isArabic ? 'رجوع' : 'Go Back',
+                      style: TextStyle(
+                        fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black54,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 65,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFCCB3),
-                          foregroundColor: const Color(0xFFE64A19),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel the ride', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 30),
@@ -285,22 +353,23 @@ class TripInformationScreen extends StatelessWidget {
 
   Widget _buildCityBadge(String city) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.primaryOrange.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [BoxShadow(color: AppColors.primaryOrange.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+        color: AppColors.primaryOrange.withOpacity(0.85),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: AppColors.primaryOrange.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
       ),
-      child: Text(city, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      child: Text(city, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
     );
   }
 
   Widget _buildInfoItem(IconData icon, String value, String label) {
     return Column(
       children: [
-        Icon(icon, size: 28, color: Colors.black),
+        Icon(icon, size: 26, color: AppColors.primaryOrange),
         const SizedBox(height: 6),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+        Text(label, style: const TextStyle(color: Colors.black45, fontSize: 11)),
       ],
     );
   }
@@ -310,14 +379,14 @@ class TripInformationScreen extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: TextStyle(
-          fontSize: isTotal ? 20 : 17,
+          fontSize: isTotal ? 17 : 15,
           fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
           color: isTotal ? Colors.black : Colors.black54,
         )),
         Text(value, style: TextStyle(
-          fontSize: isTotal ? 20 : 17,
+          fontSize: isTotal ? 17 : 15,
           fontWeight: isTotal ? FontWeight.w900 : FontWeight.bold,
-          color: Colors.black,
+          color: isTotal ? AppColors.primaryOrange : Colors.black,
         )),
       ],
     );

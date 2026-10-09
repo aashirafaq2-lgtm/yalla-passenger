@@ -224,10 +224,11 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
                               ? null
                               : () async {
                                   _dismissKeyboard();
-                                  final phone =
-                                      '+964${_phoneController.text.trim()}';
-                                  if (_nameController.text.trim().isEmpty ||
-                                      _phoneController.text.trim().isEmpty) {
+                                  String rawPhone = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
+                                  if (rawPhone.startsWith('964')) rawPhone = rawPhone.substring(3);
+                                  if (rawPhone.startsWith('0')) rawPhone = rawPhone.substring(1);
+                                  final phone = '+964$rawPhone';
+                                  if (_nameController.text.trim().isEmpty || rawPhone.isEmpty) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                           content: Text(
@@ -235,9 +236,10 @@ class _PassengerSignUpScreenState extends State<PassengerSignUpScreen> {
                                     );
                                     return;
                                   }
-                                  final success = await auth.login(
-                                    phone,
-                                    fullName: _nameController.text.trim(),
+                                  final success = await auth.registerPassenger(
+                                    phone: phone,
+                                    name: _nameController.text.trim(),
+                                    age: _ageController.text.trim(),
                                   );
                                   if (!context.mounted) return;
                                   if (success) {

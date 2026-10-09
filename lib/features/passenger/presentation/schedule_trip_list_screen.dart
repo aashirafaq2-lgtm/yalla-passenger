@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'schedule_trip_config_screen.dart';
 
 class ScheduleTripListScreen extends StatefulWidget {
@@ -12,10 +15,37 @@ class ScheduleTripListScreen extends StatefulWidget {
 
 class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
   String filterOrigin = 'Kirkuk';
-  String filterDest = 'Bagdad';
-  final List<String> cities = ['Kirkuk', 'Bagdad', 'Erbil', 'Basra', 'Najaf', 'Karbala', 'Mosul'];
+  String filterDest = 'Baghdad';
+  final List<String> cities = ['Kirkuk', 'Baghdad', 'Erbil', 'Basra', 'Sulaymaniyah', 'Najaf', 'Karbala', 'Mosul', 'Dohuk', 'Anbar', 'Babel', 'Wasit'];
   bool _isSearching = false;
   final TextEditingController _searchCtrl = TextEditingController();
+  List<dynamic> _trips = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrips();
+  }
+
+  Future<void> _loadTrips() async {
+    setState(() => _isLoading = true);
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final res = await api.dio.get('/trips/available');
+      if (res.statusCode == 200 && res.data['trips'] != null) {
+        final allTrips = List<dynamic>.from(res.data['trips']);
+        setState(() {
+          _trips = allTrips;
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('Load available trips error: $e');
+    }
+    setState(() => _isLoading = false);
+  }
 
   @override
   void dispose() {
@@ -25,6 +55,17 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
+
+    final query = _searchCtrl.text.trim().toLowerCase();
+    final filtered = _trips.where((t) {
+      if (query.isEmpty) return true;
+      final from = (t['fromGovernorate']?['name'] ?? '').toString().toLowerCase();
+      final to = (t['toGovernorate']?['name'] ?? '').toString().toLowerCase();
+      return from.contains(query) || to.contains(query);
+    }).toList();
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -43,7 +84,7 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                         border: Border.all(color: Colors.black12),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
@@ -53,17 +94,21 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                             ? TextField(
                                 controller: _searchCtrl,
                                 autofocus: true,
-                                decoration: const InputDecoration(
-                                  hintText: 'Search trips...',
+                                decoration: InputDecoration(
+                                  hintText: isArabic ? 'ابحث عن الرحلات...' : 'Search trips...',
                                   border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                                 ),
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                                 onChanged: (val) => setState(() {}),
                               )
-                            : const Text(
-                                'Schedule a trip',
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                            : Text(
+                                isArabic ? 'رحلة مجدولة' : 'Schedule a trip',
+                                style: TextStyle(
+                                  fontSize: 22, 
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                                ),
                               ),
                       ),
                     ),
@@ -86,39 +131,142 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+
+            // Prominent Search & Quick Filter Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.black12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, color: AppColors.primaryOrange, size: 22),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        decoration: InputDecoration(
+                          hintText: isArabic ? 'ابحث باسم المحافظة (مثل: كركوك، بغداد)...' : 'Search by governorate (e.g. Kirkuk, Baghdad)...',
+                          hintStyle: TextStyle(fontSize: 13, color: Colors.black45, fontFamily: isArabic ? 'NotoKufiArabic' : null),
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        onChanged: (val) => setState(() {}),
+                      ),
+                    ),
+                    if (_searchCtrl.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 18, color: Colors.black45),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() {});
+                        },
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryOrange,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          isArabic ? 'بحث' : 'Search',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
 
             // Trip List
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  _buildTripCard(
-                    context,
-                    from: 'Kirkuk',
-                    to: 'Bagdad',
-                    time: '2:00 PM',
-                    date: '14/2/2026',
-                    seats: '4',
-                    price: '75,000 IQD',
-                    car: 'Dodge Charger',
-                    index: 0,
-                  ),
-                  _buildTripCard(
-                    context,
-                    from: 'Kirkuk',
-                    to: 'Erbil',
-                    time: '2:00 PM',
-                    date: '14/2/2026',
-                    seats: '4',
-                    price: '10,000 IQD',
-                    car: 'Toyota Corolla',
-                    index: 1,
-                  ),
-                  _buildInteractiveFilterCard(),
-                ],
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange))
+                  : RefreshIndicator(
+                      color: AppColors.primaryOrange,
+                      onRefresh: _loadTrips,
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                        children: [
+                          if (filtered.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.directions_car_outlined, size: 60, color: Colors.grey.shade300),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      isArabic ? 'لا توجد رحلات مجدولة متاحة حالياً' : 'No scheduled trips available right now',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600, 
+                                        fontSize: 15, 
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ...List.generate(filtered.length, (index) {
+                            final t = filtered[index];
+                            final from = t['fromGovernorate']?['name'] ?? (isArabic ? 'كركوك' : 'Kirkuk');
+                            final to = t['toGovernorate']?['name'] ?? (isArabic ? 'بغداد' : 'Baghdad');
+                            final seats = (t['availableSeats'] ?? 4).toString();
+                            final price = '${t['pricePerSeat'] ?? 15000} ${isArabic ? "د.ع" : "IQD"}';
+                            final car = t['carType']?['name'] ?? t['driver']?['vehicle']?['model'] ?? 'Dodge Charger';
+                            final dateRaw = t['departureTime'];
+                            String date = isArabic ? 'اليوم' : 'Today';
+                            String time = '2:00 PM';
+                            if (dateRaw != null) {
+                              try {
+                                final dt = DateTime.parse(dateRaw.toString()).toLocal();
+                                date = '${dt.day}/${dt.month}/${dt.year}';
+                                final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+                                final amPm = dt.hour >= 12 ? (isArabic ? 'م' : 'PM') : (isArabic ? 'ص' : 'AM');
+                                time = '$hour:${dt.minute.toString().padLeft(2, '0')} $amPm';
+                              } catch (_) {}
+                            }
+
+                            final driverName = [t['driver']?['firstName'], t['driver']?['lastName']]
+                                .where((v) => v != null && v.toString().isNotEmpty).join(' ');
+
+                            return _buildTripCard(
+                              context,
+                              tripId: t['id']?.toString(),
+                              from: from,
+                              to: to,
+                              time: time,
+                              date: date,
+                              seats: seats,
+                              price: price,
+                              car: car,
+                              index: index,
+                              isArabic: isArabic,
+                              pricePerSeat: t['pricePerSeat'] ?? 15000,
+                              driverName: driverName.isEmpty ? 'Driver' : driverName,
+                            );
+                          }),
+                          _buildInteractiveFilterCard(isArabic),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
@@ -128,6 +276,7 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
 
   Widget _buildTripCard(
     BuildContext context, {
+    String? tripId,
     required String from,
     required String to,
     required String time,
@@ -136,6 +285,9 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
     required String price,
     required String car,
     required int index,
+    bool isArabic = false,
+    dynamic pricePerSeat,
+    String driverName = 'Driver',
   }) {
     return FadeInUp(
       delay: Duration(milliseconds: 200 * index),
@@ -161,7 +313,7 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildCityBadge(from),
-                const Icon(Icons.arrow_right_alt, size: 30),
+                Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
                 _buildCityBadge(to),
               ],
             ),
@@ -170,9 +322,9 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildInfoItem(Icons.accessible_forward, seats, 'Seats'),
-                _buildInfoItem(Icons.access_time_filled, time, 'Time'),
-                _buildInfoItem(Icons.calendar_month, date, 'Date'),
+                _buildInfoItem(Icons.accessible_forward, seats, isArabic ? 'المقاعد' : 'Seats'),
+                _buildInfoItem(Icons.access_time_filled, time, isArabic ? 'الوقت' : 'Time'),
+                _buildInfoItem(Icons.calendar_month, date, isArabic ? 'التاريخ' : 'Date'),
               ],
             ),
             const SizedBox(height: 20),
@@ -183,7 +335,7 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                     const Text('Price', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                     Text(isArabic ? 'السعر' : 'Price', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                      Text(price, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
@@ -196,14 +348,36 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            // Driver info row
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Color(0xFFFFF3E0),
+                  child: Icon(Icons.person, color: AppColors.primaryOrange, size: 18),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    driverName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
             // Book Button
             SizedBox(
-              width: 150,
-              height: 45,
+              width: double.infinity,
+              height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryOrange.withOpacity(0.8),
+                  backgroundColor: AppColors.primaryOrange,
                   foregroundColor: Colors.white,
                   elevation: 5,
                   shadowColor: AppColors.primaryOrange.withOpacity(0.3),
@@ -214,14 +388,24 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => ScheduleTripConfigScreen(
+                        tripId: tripId,
                         initialOrigin: from,
                         initialDestination: to,
                         isStaticCity: true,
+                        pricePerSeat: pricePerSeat ?? 15000,
+                        driverName: driverName,
                       ),
                     ),
                   );
                 },
-                child: const Text('Book now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: Text(
+                  isArabic ? 'احجز الآن' : 'Book now', 
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 16,
+                    fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                  ),
+                ),
               ),
             ),
           ],
@@ -229,6 +413,7 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
       ),
     );
   }
+
 
   Widget _buildCityBadge(String city) {
     return Container(
@@ -257,7 +442,7 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
     );
   }
 
-  Widget _buildInteractiveFilterCard() {
+  Widget _buildInteractiveFilterCard([bool isArabic = false]) {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(20),
@@ -269,29 +454,51 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
       ),
       child: Column(
         children: [
-           Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildFilterBadge(filterOrigin, (val) => setState(() => filterOrigin = val!)),
-                const Icon(Icons.arrow_right_alt, size: 30),
-                _buildFilterBadge(filterDest, (val) => setState(() => filterDest = val!)),
-              ],
+          Text(
+            isArabic ? 'بحث عن رحلة' : 'Search for a Trip',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontFamily: isArabic ? 'NotoKufiArabic' : null,
             ),
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: IconButton(
-                icon: const Icon(Icons.calendar_month_outlined, color: AppColors.primaryOrange),
-                onPressed: () async {
-                  await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2024),
-                    lastDate: DateTime(2030),
-                  );
-                },
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildFilterBadge(filterOrigin, (val) => setState(() => filterOrigin = val!)),
+              const Icon(Icons.arrow_forward, size: 28, color: Colors.black54),
+              _buildFilterBadge(filterDest, (val) => setState(() => filterDest = val!)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shadowColor: AppColors.primaryOrange.withOpacity(0.3),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () {
+                _searchCtrl.text = filterOrigin;
+                setState(() {});
+                _loadTrips();
+              },
+              icon: const Icon(Icons.search, size: 20),
+              label: Text(
+                isArabic ? 'بحث عن رحلات' : 'Search Trips',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                ),
               ),
             ),
+          ),
         ],
       ),
     );

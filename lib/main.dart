@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -17,7 +18,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -28,16 +29,13 @@ void main() async {
   final authRepository = AuthRepository(apiService, storageService);
   final notificationService = NotificationService(apiService, storageService);
 
-  // Initialize Notifications & Deferred Deep Linking
-  await notificationService.initialize();
-  DeferredLinkService.resolveOnStartup();
-
   runApp(
     MultiProvider(
       providers: [
         Provider.value(value: apiService),
         Provider.value(value: storageService),
-        ChangeNotifierProvider(create: (_) => AuthProvider(authRepository, apiService)),
+        ChangeNotifierProvider(
+            create: (_) => AuthProvider(authRepository, apiService)),
         Provider(create: (_) => SocketService(storageService)),
         Provider.value(value: notificationService),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
@@ -45,6 +43,25 @@ void main() async {
       child: const YallaApp(),
     ),
   );
+
+  // Notifications and Firebase token lookup must never hold the first frame.
+  // A slow or unavailable FCM/network request used to leave users on the logo.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(Future<void>.delayed(const Duration(seconds: 3), () async {
+      try {
+        await NotificationService.initialize(apiService, storageService)
+            .timeout(const Duration(seconds: 15));
+      } catch (error) {
+        debugPrint('[Startup] Notification setup deferred: $error');
+      }
+    }));
+    unawaited(DeferredLinkService.resolveOnStartup()
+        .timeout(const Duration(seconds: 6))
+        .then<void>((_) {})
+        .catchError((Object error) {
+      debugPrint('[Startup] Deferred link lookup skipped: $error');
+    }));
+  });
 }
 
 class YallaApp extends StatelessWidget {
@@ -55,7 +72,8 @@ class YallaApp extends StatelessWidget {
     final localeProvider = Provider.of<LocaleProvider>(context);
 
     return Directionality(
-      textDirection: localeProvider.isArabic ? TextDirection.rtl : TextDirection.ltr,
+      textDirection:
+          localeProvider.isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: MaterialApp(
         title: 'Yalla',
         debugShowCheckedModeBanner: false,

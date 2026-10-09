@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,23 +20,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: AppColors.brandGradient,
-        ),
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
+
+    return Directionality(
+      textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+      child: Scaffold(
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: AppColors.brandGradient,
+          ),
           child: Column(
             children: [
-              const SizedBox(height: 60),
-              // Header with Back Button
+              const SizedBox(height: 50),
+              // Header with Back Button and Language Toggle
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                      icon: Icon(isArabic ? Icons.arrow_forward_ios : Icons.arrow_back_ios_new, color: Colors.white),
                       onPressed: () => Navigator.pop(context),
                     ),
                     Hero(
@@ -47,7 +55,37 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 48), 
+                    // Language Toggle Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white30),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: isArabic ? 'ar' : 'en',
+                          dropdownColor: const Color(0xFF1E1E20),
+                          isDense: true,
+                          icon: const Icon(Icons.language, size: 16, color: Colors.white),
+                          borderRadius: BorderRadius.circular(12),
+                          items: [
+                            DropdownMenuItem(
+                              value: 'ar',
+                              child: Text('العربية', style: GoogleFonts.notoKufiArabic(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                            ),
+                            DropdownMenuItem(
+                              value: 'en',
+                              child: Text('English', style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                          onChanged: (lang) {
+                            if (lang != null) locale.setLocale(Locale(lang));
+                          },
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -72,13 +110,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Welcome to Yalla',
-                        style: AppTypography.h2Bold.copyWith(fontSize: MediaQuery.sizeOf(context).width * 0.08),
+                        isArabic ? 'مرحباً بك في يَلَّا' : 'Welcome to Yalla',
+                        style: isArabic 
+                            ? GoogleFonts.notoKufiArabic(fontSize: 26, fontWeight: FontWeight.w900, color: const Color(0xFF1C1C1E))
+                            : AppTypography.h2Bold.copyWith(fontSize: MediaQuery.sizeOf(context).width * 0.08),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Enter your phone number to continue.',
-                        style: TextStyle(color: Colors.black54, fontSize: 16),
+                      Text(
+                        isArabic ? 'أدخل رقم هاتفك للمتابعة' : 'Enter your phone number to continue.',
+                        style: isArabic 
+                            ? GoogleFonts.notoKufiArabic(color: Colors.black54, fontSize: 14)
+                            : const TextStyle(color: Colors.black54, fontSize: 16),
                       ),
                       const SizedBox(height: 40),
                       
@@ -142,21 +184,29 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             );
                           },
-                          child: const Text(
-                            'Send OTP Code',
+                          child: Text(
+                            isArabic ? 'إرسال رمز التحقق' : 'Send OTP Code',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
+                              fontFamily: isArabic ? 'NotoKufiArabic' : null,
                             ),
                           ),
                         ),
                       ),
                       
                       const SizedBox(height: 24),
-                      const Center(
+                      Center(
                         child: Text(
-                          'By continuing, you agree to our Terms of Service',
-                          style: TextStyle(color: Colors.black38, fontSize: 12),
+                          isArabic 
+                              ? 'بمتابعتك، فإنك توافق على شروط الخدمة وسياسة الخصوصية'
+                              : 'By continuing, you agree to our Terms of Service',
+                          style: TextStyle(
+                            color: Colors.black38, 
+                            fontSize: 12,
+                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
                     ],
@@ -165,6 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
           ),
+        ),
       ),
     );
   }

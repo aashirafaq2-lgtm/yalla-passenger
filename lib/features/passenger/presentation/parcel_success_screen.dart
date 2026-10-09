@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'passenger_main_screen.dart';
 
 class ParcelSuccessScreen extends StatelessWidget {
@@ -10,6 +12,8 @@ class ParcelSuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
 
     return Scaffold(
       backgroundColor: AppColors.primaryOrange,
@@ -36,11 +40,12 @@ class ParcelSuccessScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const SizedBox(height: 40),
-                  const Text(
-                    'Your Order has been\nsuccessfully Created!',
+                  Text(
+                    isArabic ? 'تم إنشاء طلب الشحنة\nبنجاح!' : 'Your Order has been\nsuccessfully Created!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                      fontSize: isArabic ? 22 : 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
                       height: 1.4,
@@ -56,7 +61,7 @@ class ParcelSuccessScreen extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.primaryOrange, width: 6),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.check_rounded,
                         size: 100,
                         color: AppColors.primaryOrange,
@@ -67,15 +72,20 @@ class ParcelSuccessScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        'Thank you for using with IQ ',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      Text(
+                        isArabic ? 'شكراً لاستخدامك تطبيق ' : 'Thank you for using with IQ ',
+                        style: TextStyle(
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold
+                        ),
                       ),
                       Text(
                         'يَلَّا',
                         style: GoogleFonts.notoKufiArabic(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
+                          color: AppColors.primaryOrange,
                         ),
                       ),
                     ],
@@ -108,9 +118,13 @@ class ParcelSuccessScreen extends StatelessWidget {
                           MaterialPageRoute(builder: (_) => const PassengerMainScreen()),
                         );
                       },
-                      child: const Text(
-                        'Back to Home',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                      child: Text(
+                        isArabic ? 'العودة للرئيسية' : 'Back to Home',
+                        style: TextStyle(
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          fontSize: 18, 
+                          fontWeight: FontWeight.w900
+                        ),
                       ),
                     ),
                   ),

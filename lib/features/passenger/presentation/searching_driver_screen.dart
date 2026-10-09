@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
@@ -6,9 +7,12 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/services/sound_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/providers/locale_provider.dart';
 import 'active_ride_screen.dart';
+import 'passenger_main_screen.dart';
 
 class SearchingDriverScreen extends StatefulWidget {
   final Map<String, dynamic>? rideData;
@@ -22,6 +26,8 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
   late AnimationController _pulseController;
   bool _driverAccepted = false;
   String? _activeRideId;
+  Timer? _pollTimer;
+  bool _terminalRideHandled = false;
 
   @override
   void initState() {
@@ -38,50 +44,118 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
     });
   }
 
+  void _onDriverAcceptedAction(dynamic driverData) {
+    if (!mounted || _driverAccepted) return;
+    _driverAccepted = true;
+    _pollTimer?.cancel();
+
+    // Play premium Uber-style driver found chime
+    try {
+      SoundService().playRideAccepted();
+    } catch (_) {}
+
+    // Merge driver acceptance data with original ride data
+    final mergedData = Map<String, dynamic>.from(widget.rideData ?? {});
+    if (driverData is Map) {
+      mergedData.addAll(Map<String, dynamic>.from(driverData));
+    }
+    mergedData['rideId'] ??= mergedData['id'] ?? _activeRideId;
+    mergedData['id'] ??= mergedData['rideId'] ?? _activeRideId;
+
+    if (driverData is Map) {
+      if (driverData['driver'] != null) {
+        final d = driverData['driver'];
+        mergedData['driverName'] ??= '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
+        mergedData['driverPhone'] ??= d['phone'];
+        if (d['vehicle'] != null) {
+          final v = d['vehicle'];
+          mergedData['carModel'] ??= '${v['make'] ?? ''} ${v['model'] ?? ''}'.trim();
+          mergedData['plate'] ??= v['licensePlate'];
+        }
+      } else {
+        // Fallback to top-level fields provided by getActiveRide
+        if (driverData['driverName'] != null) mergedData['driverName'] = driverData['driverName'];
+        if (driverData['driverPhone'] != null) mergedData['driverPhone'] = driverData['driverPhone'];
+        if (driverData['carModel'] != null) mergedData['carModel'] = driverData['carModel'];
+        if (driverData['plate'] != null) mergedData['plate'] = driverData['plate'];
+      }
+    }
+
+    // Trigger local push notification in Android notification bar
+    try {
+      NotificationService.notifyRideAccepted(
+        driverName: mergedData['driverName']?.toString(),
+        carModel: mergedData['carModel']?.toString(),
+        plate: mergedData['plate']?.toString(),
+      );
+    } catch (e) {
+      debugPrint('[SearchingDriverScreen] Local notification error: $e');
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => ActiveRideScreen(rideData: mergedData)),
+    );
+  }
+
   void _dispatchRealtimeRideRequest() async {
     final socketService = Provider.of<SocketService>(context, listen: false);
     final storageService = Provider.of<StorageService>(context, listen: false);
-    final userId = await storageService.getUserId() ?? 'passenger_${DateTime.now().millisecondsSinceEpoch}';
+    await socketService.connect();
+    if (!mounted) return;
 
     final rideId = _activeRideId ?? 'ride_${DateTime.now().millisecondsSinceEpoch}';
     _activeRideId = rideId;
 
-    final payload = {
-      'id': rideId,
-      'rideId': rideId,
-      'passengerId': userId,
-      'passengerName': widget.rideData?['passengerName'] ?? 'Passenger',
-      'passengerPhone': widget.rideData?['passengerPhone'] ?? '07700000000',
-      'pickupName': widget.rideData?['pickupName'] ?? 'Current Location',
-      'dropName': widget.rideData?['dropName'] ?? 'Destination',
-      'pickupLat': widget.rideData?['pickupLat'] ?? 33.3152,
-      'pickupLng': widget.rideData?['pickupLng'] ?? 44.3661,
-      'dropLat': widget.rideData?['dropLat'] ?? 33.3000,
-      'dropLng': widget.rideData?['dropLng'] ?? 44.3800,
-      'estimatedPrice': widget.rideData?['estimatedPrice'] ?? 10000,
-      'serviceType': widget.rideData?['serviceType'] ?? 'Economy',
-      'otp': widget.rideData?['otp'],
-    };
+    // The REST creation endpoint is the sole dispatcher. This screen only
+    // subscribes to the persisted ride so it cannot create duplicate requests.
+    socketService.onRideAccepted = _onDriverAcceptedAction;
+    socketService.onRideCancelled = _handleRideCancelled;
+    socketService.joinRide(rideId);
 
-    // Emit live request to nearby drivers
-    socketService.requestRide(payload);
-
-    // Listen for driver acceptance
-    socketService.onRideAccepted = (driverData) {
-      if (!mounted || _driverAccepted) return;
-      _driverAccepted = true;
-
-      // Merge driver acceptance data with original ride data (e.g. otp, pickup/drop)
-      final mergedData = Map<String, dynamic>.from(widget.rideData ?? {});
-      if (driverData is Map) {
-        mergedData.addAll(Map<String, dynamic>.from(driverData));
+    // Direct room and broadcast event listeners
+    socketService.socket?.on('ride_accepted_$rideId', (data) {
+      _onDriverAcceptedAction(data);
+    });
+    socketService.socket?.on('ride_accepted', (data) {
+      if (data is Map && (data['id']?.toString() == rideId || data['rideId']?.toString() == rideId)) {
+        _onDriverAcceptedAction(data);
       }
+    });
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => ActiveRideScreen(rideData: mergedData)),
-      );
-    };
+    // REST remains the source-of-truth fallback if the socket is interrupted.
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) async {
+      if (!mounted || _driverAccepted) return;
+      try {
+        final api = Provider.of<ApiService>(context, listen: false);
+        final token = await storageService.getToken();
+        if (token != null) {
+          final res = await api.getActiveRide(token);
+          if (res.statusCode == 200 && res.data?['activeRide'] != null) {
+            final activeRide = res.data['activeRide'];
+            final status = activeRide['status']?.toString() ?? '';
+            if (['ACCEPTED', 'ARRIVED', 'PICKED_UP', 'ONGOING', 'TRIPPING'].contains(status)) {
+              _onDriverAcceptedAction(activeRide);
+              return;
+            }
+          }
+          
+          if (_activeRideId != null) {
+            final rideResponse = await api.getRide(_activeRideId!, token);
+            final ride = rideResponse.data?['ride'] ?? rideResponse.data;
+            if (ride is Map) {
+              final status = ride['status']?.toString() ?? '';
+              if (['ACCEPTED', 'ARRIVED', 'PICKED_UP', 'ONGOING', 'TRIPPING'].contains(status)) {
+                _onDriverAcceptedAction(ride);
+              } else if (['CANCELLED', 'NO_DRIVER_FOUND', 'COMPLETED'].contains(status)) {
+                _handleRideCancelled({'rideId': _activeRideId, 'status': status, 'reason': status});
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    });
 
     // Real production timeout (45s)
     Future.delayed(const Duration(seconds: 45), () {
@@ -135,6 +209,19 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
     });
   }
 
+  void _handleRideCancelled(dynamic data) {
+    if (!mounted || _terminalRideHandled || data is! Map) return;
+    if (data['rideId']?.toString() != _activeRideId) return;
+    _terminalRideHandled = true;
+    _pollTimer?.cancel();
+    final reason = data['reason']?.toString() ?? 'The ride was cancelled.';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(reason)));
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const PassengerMainScreen()),
+      (route) => false,
+    );
+  }
+
   Future<void> _cancelRequest() async {
     final storage = Provider.of<StorageService>(context, listen: false);
     final api = Provider.of<ApiService>(context, listen: false);
@@ -149,12 +236,21 @@ class _SearchingDriverScreenState extends State<SearchingDriverScreen> with Sing
     }
 
     if (mounted) {
-      Navigator.pop(context);
+      // Go to home screen — not login/auth screen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const PassengerMainScreen()),
+        (route) => false,
+      );
     }
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
+    final socket = Provider.of<SocketService>(context, listen: false);
+    socket.onRideAccepted = null;
+    socket.onRideCancelled = null;
+    if (_activeRideId != null) socket.socket?.off('ride_accepted_$_activeRideId');
     _pulseController.dispose();
     super.dispose();
   }

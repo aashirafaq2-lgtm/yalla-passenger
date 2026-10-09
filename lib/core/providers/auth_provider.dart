@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../features/auth/repositories/auth_repository.dart';
 import '../network/api_service.dart';
+import '../services/notification_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _authRepository;
@@ -25,11 +26,26 @@ class AuthProvider extends ChangeNotifier {
     return success;
   }
 
+  Future<bool> registerPassenger({required String phone, required String name, String? age}) async {
+    _isLoading = true;
+    notifyListeners();
+    _currentPhone = phone;
+    _pendingFullName = name;
+    final success = await _authRepository.registerPassenger(phone: phone, name: name, age: age);
+    _isLoading = false;
+    notifyListeners();
+    return success;
+  }
+
   Future<bool> verifyOtp(String otp) async {
     if (_currentPhone == null) return false;
     _isLoading = true;
     notifyListeners();
     final success = await _authRepository.verifyOtp(_currentPhone!, otp);
+    if (success) {
+      final token = await _authRepository.getStoredToken();
+      if (token != null) await NotificationService.syncDeviceToken(_apiService, token);
+    }
 
     // If signup flow and we have a name to save, update the profile
     if (success && _pendingFullName != null && _pendingFullName!.isNotEmpty) {

@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class LocaleProvider extends ChangeNotifier {
   static const String _prefKey = 'selected_language';
-  Locale _locale = const Locale('en');
+  Locale _locale = const Locale('ar');
 
   Locale get locale => _locale;
   bool get isArabic => _locale.languageCode == 'ar';
@@ -16,7 +16,7 @@ class LocaleProvider extends ChangeNotifier {
   Future<void> _loadSavedLocale() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final code = prefs.getString(_prefKey) ?? 'en';
+      final code = prefs.getString(_prefKey) ?? 'ar';
       _locale = Locale(code);
       notifyListeners();
     } catch (_) {}
@@ -108,6 +108,45 @@ class LocaleProvider extends ChangeNotifier {
       'min': 'min',
       'km': 'km',
       'iqd': 'IQD',
+      // Home Screen
+      'find_trip': 'Find a Trip',
+      'find_trip_subtitle': 'Find nearby rides\nand book instantly',
+      'find_trip_now': 'Find a Trip now',
+      'find_trip_title': 'Find a\nTrip now!',
+      'schedule_trip': 'Schedule a trip',
+      'schedule_trip_subtitle': 'Plan your trip in advance\nand we\'ll handle the rest.',
+      'send_mail_parcel': 'Sending mail\nor parcels',
+      'send_mail_subtitle': 'Fast and reliable delivery\nfor your letters and parcels.',
+      'book_entire': 'Book the\nentire car',
+      'book_entire_subtitle': 'Book the whole car for\nyou and your group.',
+      // Parcel
+      'parcel_type': 'Parcel Type',
+      'sender_details': 'Sender Details',
+      'receiver_details': 'Receiver Details',
+      'parcel_summary': 'Parcel Summary',
+      'parcel_success': 'Parcel Sent!',
+      'from': 'From',
+      'to': 'To',
+      'date': 'Date',
+      'price': 'Price',
+      'seats': 'Seats',
+      'per_seat': 'per seat',
+      'status': 'Status',
+      'confirm': 'Confirm',
+      'ok': 'OK',
+      'close': 'Close',
+      'yes': 'Yes',
+      'no': 'No',
+      'loading': 'Loading...',
+      'error': 'Error',
+      'success': 'Success',
+      'resend_code': 'Resend Code',
+      'back': 'Back',
+      'submit': 'Submit',
+      'first_name': 'First Name',
+      'last_name': 'Last Name',
+      'email': 'Email Address',
+      'phone': 'Phone Number',
     },
     'ar': {
       'app_name': 'يَلَّا',
@@ -180,6 +219,45 @@ class LocaleProvider extends ChangeNotifier {
       'min': 'دقيقة',
       'km': 'كم',
       'iqd': 'د.ع',
+      // Home Screen
+      'find_trip': 'ابحث عن رحلة',
+      'find_trip_subtitle': 'ابحث عن رحلات قريبة\nواحجز فوراً',
+      'find_trip_now': 'ابحث عن رحلة الآن',
+      'find_trip_title': 'ابحث عن\nرحلة الآن!',
+      'schedule_trip': 'رحلة مجدولة',
+      'schedule_trip_subtitle': 'خطط لرحلتك مسبقاً\nونحن نتكفل بالباقي.',
+      'send_mail_parcel': 'إرسال بريد\nأو طرود',
+      'send_mail_subtitle': 'توصيل سريع وموثوق\nلرسائلك وطرودك.',
+      'book_entire': 'حجز\nسيارة كاملة',
+      'book_entire_subtitle': 'احجز السيارة بالكامل\nلك ولمجموعتك.',
+      // Parcel
+      'parcel_type': 'نوع الطرد',
+      'sender_details': 'تفاصيل المرسل',
+      'receiver_details': 'تفاصيل المستلم',
+      'parcel_summary': 'ملخص الطرد',
+      'parcel_success': 'تم إرسال الطرد!',
+      'from': 'من',
+      'to': 'إلى',
+      'date': 'التاريخ',
+      'price': 'السعر',
+      'seats': 'المقاعد',
+      'per_seat': 'لكل مقعد',
+      'status': 'الحالة',
+      'confirm': 'تأكيد',
+      'ok': 'موافق',
+      'close': 'إغلاق',
+      'yes': 'نعم',
+      'no': 'لا',
+      'loading': 'جاري التحميل...',
+      'error': 'خطأ',
+      'success': 'نجاح',
+      'resend_code': 'إعادة إرسال الرمز',
+      'back': 'رجوع',
+      'submit': 'إرسال',
+      'first_name': 'الاسم الأول',
+      'last_name': 'اسم العائلة',
+      'email': 'البريد الإلكتروني',
+      'phone': 'رقم الهاتف',
     },
   };
 

@@ -124,7 +124,7 @@ class _PassengerChatScreenState extends State<PassengerChatScreen> {
 
     // Emit via socket to driver & database
     final socketService = Provider.of<SocketService>(context, listen: false);
-    socketService.socket.emit('send_message', {
+    socketService.socket?.emit('send_message', {
       'rideId': widget.rideId,
       'text': text,
       'senderId': _myUserId,

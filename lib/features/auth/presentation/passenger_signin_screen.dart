@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'passenger_otp_screen.dart';
 import 'passenger_signup_screen.dart';
 
@@ -28,67 +30,106 @@ class _PassengerSignInScreenState extends State<PassengerSignInScreen> {
   @override
   Widget build(BuildContext context) {
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
 
-    return GestureDetector(
-      onTap: _dismissKeyboard,
-      behavior: HitTestBehavior.opaque,
-      child: Scaffold(
-        backgroundColor: AppColors.primaryOrange,
-        resizeToAvoidBottomInset: true,
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
-                  ),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      children: [
-                        // White Card at top
-                        Expanded(
-                          child: FadeInDown(
-                            duration: const Duration(milliseconds: 600),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.only(
-                                  bottomLeft: Radius.circular(50),
-                                  bottomRight: Radius.circular(50),
+    return Directionality(
+      textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+      child: GestureDetector(
+        onTap: _dismissKeyboard,
+        behavior: HitTestBehavior.opaque,
+        child: Scaffold(
+          backgroundColor: AppColors.primaryOrange,
+          resizeToAvoidBottomInset: true,
+          body: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        children: [
+                          // White Card at top
+                          Expanded(
+                            child: FadeInDown(
+                              duration: const Duration(milliseconds: 600),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.only(
+                                    bottomLeft: Radius.circular(50),
+                                    bottomRight: Radius.circular(50),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black12,
+                                      blurRadius: 20,
+                                      offset: Offset(0, 10),
+                                    ),
+                                  ],
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black12,
-                                    blurRadius: 20,
-                                    offset: Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  const SizedBox(height: 20),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-                                        onPressed: () => Navigator.pop(context),
-                                      ),
-                                      Text(
-                                        'Sign in',
-                                        style: AppTypography.h3Bold.copyWith(
-                                          color: Colors.black,
-                                          fontWeight: FontWeight.w900,
+                                child: Column(
+                                  children: [
+                                    const SizedBox(height: 20),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(isArabic ? Icons.arrow_forward_ios : Icons.arrow_back_ios_new, color: Colors.black),
+                                          onPressed: () => Navigator.pop(context),
                                         ),
-                                      ),
-                                      const SizedBox(width: 48),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 40),
+                                        Text(
+                                          isArabic ? 'تسجيل الدخول' : 'Sign in',
+                                          style: isArabic
+                                              ? GoogleFonts.notoKufiArabic(
+                                                  color: Colors.black,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 20,
+                                                )
+                                              : AppTypography.h3Bold.copyWith(
+                                                  color: Colors.black,
+                                                  fontWeight: FontWeight.w900,
+                                                ),
+                                        ),
+                                        // Language Selector
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.offWhite,
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: Colors.black12),
+                                          ),
+                                          child: DropdownButtonHideUnderline(
+                                            child: DropdownButton<String>(
+                                              value: isArabic ? 'ar' : 'en',
+                                              isDense: true,
+                                              icon: const Icon(Icons.language, size: 16, color: AppColors.primaryOrange),
+                                              borderRadius: BorderRadius.circular(12),
+                                              items: [
+                                                DropdownMenuItem(
+                                                  value: 'ar',
+                                                  child: Text('العربية', style: GoogleFonts.notoKufiArabic(fontSize: 12, fontWeight: FontWeight.bold)),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 'en',
+                                                  child: Text('English', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
+                                              onChanged: (lang) {
+                                                if (lang != null) locale.setLocale(Locale(lang));
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 40),
                                   // Phone Input
                                   Row(
                                     children: [
@@ -216,13 +257,16 @@ class _PassengerSignInScreenState extends State<PassengerSignInScreen> {
                                         ? null
                                         : () async {
                                             _dismissKeyboard();
-                                            final phone = '+964${_phoneController.text.trim()}';
-                                            if (_phoneController.text.trim().isEmpty) {
+                                            String raw = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
+                                            if (raw.isEmpty) {
                                               ScaffoldMessenger.of(context).showSnackBar(
                                                 const SnackBar(content: Text('Please enter your phone number.')),
                                               );
                                               return;
                                             }
+                                            if (raw.startsWith('964')) raw = raw.substring(3);
+                                            if (raw.startsWith('0')) raw = raw.substring(1);
+                                            final phone = '+964$raw';
                                             final success = await auth.login(phone);
                                             if (!context.mounted) return;
                                             if (success) {
@@ -261,6 +305,6 @@ class _PassengerSignInScreenState extends State<PassengerSignInScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 }

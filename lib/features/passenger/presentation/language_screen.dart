@@ -15,16 +15,24 @@ class _LanguageScreenState extends State<LanguageScreen> {
   Widget build(BuildContext context) {
     final localeProvider = Provider.of<LocaleProvider>(context);
     final currentCode = localeProvider.locale.languageCode;
+    final isArabic = localeProvider.isArabic;
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        leading: IconButton(
+          icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(
-          localeProvider.tr('language'), 
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)
+          localeProvider.tr('language'),
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+          ),
         ),
         centerTitle: true,
       ),
@@ -34,7 +42,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
           children: [
             _buildLanguageOption(
               title: 'English',
-              subtitle: 'English (US)',
+              subtitle: isArabic ? 'الإنجليزية (أمريكا)' : 'English (US)',
               code: 'en',
               isSelected: currentCode == 'en',
               onTap: () => localeProvider.setLocale(const Locale('en')),
@@ -42,7 +50,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
             const SizedBox(height: 16),
             _buildLanguageOption(
               title: 'العربية',
-              subtitle: 'Arabic (Iraq)',
+              subtitle: isArabic ? 'العربية (العراق)' : 'Arabic (Iraq)',
               code: 'ar',
               isSelected: currentCode == 'ar',
               onTap: () => localeProvider.setLocale(const Locale('ar')),

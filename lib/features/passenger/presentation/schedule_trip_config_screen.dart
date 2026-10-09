@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/locale_provider.dart';
 import 'map_selection_screen.dart';
 import 'trip_information_screen.dart';
 
 class ScheduleTripConfigScreen extends StatefulWidget {
+  final String? tripId;
   final String initialOrigin;
   final String initialDestination;
   final bool isStaticCity;
+  final dynamic pricePerSeat;
+  final String driverName;
 
   const ScheduleTripConfigScreen({
     super.key,
+    this.tripId,
     this.initialOrigin = 'Kirkuk',
-    this.initialDestination = 'Bagdad',
+    this.initialDestination = 'Baghdad',
     this.isStaticCity = true,
+    this.pricePerSeat = 15000,
+    this.driverName = 'Driver',
   });
 
   @override
@@ -25,7 +33,7 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
   bool frontSeat = false;
   late String selectedOrigin;
   late String selectedDestination;
-  final List<String> cities = ['Kirkuk', 'Bagdad', 'Erbil', 'Basra', 'Najaf', 'Karbala', 'Mosul'];
+  final List<String> cities = ['Kirkuk', 'Baghdad', 'Erbil', 'Basra', 'Sulaymaniyah', 'Najaf', 'Karbala', 'Mosul', 'Dohuk', 'Anbar', 'Babel', 'Wasit'];
   final TextEditingController _discountCtrl = TextEditingController();
   bool _hasDiscountCode = false;
 
@@ -47,6 +55,9 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Provider.of<LocaleProvider>(context);
+    final isArabic = locale.isArabic;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -65,15 +76,19 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                         border: Border.all(color: Colors.black12),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Center(
                         child: Text(
-                          'Schedule a trip',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          isArabic ? 'تأكيد تفاصيل الرحلة' : 'Schedule a trip',
+                          style: TextStyle(
+                            fontSize: 18, 
+                            fontWeight: FontWeight.bold,
+                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          ),
                         ),
                       ),
                     ),
@@ -102,7 +117,7 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildCityBadge(selectedOrigin, (val) => setState(() => selectedOrigin = val!)),
-                          const Icon(Icons.arrow_right_alt, size: 30),
+                          Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
                           _buildCityBadge(selectedDestination, (val) => setState(() => selectedDestination = val!)),
                         ],
                       ),
@@ -110,7 +125,7 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                       
                       // Number of seats
                       _buildActionRow(
-                        'Number of seats',
+                        isArabic ? 'عدد المقاعد' : 'Number of seats',
                         Row(
                           children: [
                             _buildCounterButton(Icons.remove, () {
@@ -118,25 +133,27 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                             }),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Text('$seats', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              child: Text('$seats', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                             ),
                             _buildCounterButton(Icons.add, () {
                               setState(() => seats++);
                             }),
                           ],
                         ),
+                        isArabic,
                       ),
                       const SizedBox(height: 16),
                       
                       // Front seat
                       _buildActionRow(
-                        'Front seat',
+                        isArabic ? 'المقعد الأمامي' : 'Front seat',
                         Checkbox(
                           value: frontSeat,
                           onChanged: (val) => setState(() => frontSeat = val!),
                           activeColor: AppColors.primaryOrange,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                         ),
+                        isArabic,
                       ),
                       const SizedBox(height: 16),
                       
@@ -154,14 +171,18 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                             border: Border.all(color: Colors.black12),
                             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Choose Your location',
-                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                                isArabic ? 'حدد موقعك على الخريطة' : 'Choose Your location',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600, 
+                                  fontSize: 16,
+                                  fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                                ),
                               ),
-                              Icon(Icons.location_on, color: Colors.black),
+                              const Icon(Icons.location_on, color: Colors.black),
                             ],
                           ),
                         ),
@@ -181,10 +202,10 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                               ),
                               child: TextField(
                                 controller: _discountCtrl,
-                                decoration: const InputDecoration(
-                                  hintText: 'Discount code',
+                                decoration: InputDecoration(
+                                  hintText: isArabic ? 'كود الخصم' : 'Discount code',
                                   border: InputBorder.none,
-                                  hintStyle: TextStyle(fontSize: 14, color: Colors.black26),
+                                  hintStyle: const TextStyle(fontSize: 14, color: Colors.black26),
                                 ),
                               ),
                             ),
@@ -202,9 +223,9 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                               ),
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid discount code')));
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isArabic ? 'كود الخصم غير صالح' : 'Invalid discount code')));
                               },
-                              child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.bold)),
+                              child: Text(isArabic ? 'تطبيق' : 'Apply', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
@@ -231,16 +252,20 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                   ),
                   child: Column(
                     children: [
-                      const Text(
-                        'Price details',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      Text(
+                        isArabic ? 'تفاصيل السعر' : 'Price details',
+                        style: TextStyle(
+                          fontSize: 18, 
+                          fontWeight: FontWeight.bold,
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                        ),
                       ),
                       const SizedBox(height: 20),
-                      _buildPriceRow('1x seat', '75,000 IQD'),
+                      _buildPriceRow(isArabic ? '$seats مقعد' : '${seats}x seat', isArabic ? '${seats * (widget.pricePerSeat ?? 15000)} د.ع' : '${seats * (widget.pricePerSeat ?? 15000)} IQD'),
                       const SizedBox(height: 12),
-                      _buildPriceRow('Front seat', frontSeat ? '5,000 IQD' : 'No'),
+                      _buildPriceRow(isArabic ? 'المقعد الأمامي' : 'Front seat', frontSeat ? (isArabic ? '5,000 د.ع' : '5,000 IQD') : (isArabic ? 'لا' : 'No')),
                       const Divider(height: 35),
-                      _buildPriceRow('Total', '25,250 IQD', isTotal: true),
+                      _buildPriceRow(isArabic ? 'الإجمالي' : 'Total', isArabic ? '${(seats * (widget.pricePerSeat ?? 15000)) + (frontSeat ? 5000 : 0)} د.ع' : '${(seats * (widget.pricePerSeat ?? 15000)) + (frontSeat ? 5000 : 0)} IQD', isTotal: true),
                     ],
                   ),
                 ),
@@ -264,11 +289,30 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
                     ),
                     onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const TripInformationScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TripInformationScreen(
+                            rideData: {
+                              'tripId': widget.tripId,
+                              'from': selectedOrigin,
+                              'to': selectedDestination,
+                              'seats': seats,
+                              'frontSeat': frontSeat,
+                              'driverName': widget.driverName,
+                              'price': '${(seats * (widget.pricePerSeat ?? 15000)) + (frontSeat ? 5000 : 0)}',
+                            },
+                          ),
+                        ),
+                      );
                     },
-                    child: const Text(
-                      'Book now',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                    child: Text(
+                      isArabic ? 'احجز الآن' : 'Book now',
+                      style: TextStyle(
+                        fontSize: 20, 
+                        fontWeight: FontWeight.w900,
+                        fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                      ),
                     ),
                   ),
                 ),
@@ -319,7 +363,7 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
     );
   }
 
-  Widget _buildActionRow(String label, Widget action) {
+  Widget _buildActionRow(String label, Widget action, [bool isArabic = false]) {
      return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -332,7 +376,14 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+          Text(
+            label, 
+            style: TextStyle(
+              fontWeight: FontWeight.w600, 
+              fontSize: 16,
+              fontFamily: isArabic ? 'NotoKufiArabic' : null,
+            ),
+          ),
           action,
         ],
       ),

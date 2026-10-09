@@ -17,6 +17,15 @@ class AuthRepository {
     }
   }
 
+  Future<bool> registerPassenger({required String phone, required String name, String? age}) async {
+    try {
+      final response = await _apiService.registerPassenger(phone: phone, name: name, age: age);
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<bool> verifyOtp(String phone, String otp) async {
     try {
       final response = await _apiService.verifyOtp(phone, otp);
