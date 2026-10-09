@@ -13,6 +13,7 @@ import 'support_screen.dart';
 import 'passenger_trips_screen.dart';
 import 'passenger_profile_edit_screen.dart';
 import 'passenger_notifications_screen.dart';
+import '../../auth/presentation/passenger_welcome_screen.dart';
 
 class PassengerProfileScreen extends StatefulWidget {
   const PassengerProfileScreen({super.key});
@@ -216,7 +217,12 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                             _buildFormattedMenuItem(Icons.logout, localeProvider.tr('sign_out'), () async {
                               final storage = Provider.of<StorageService>(context, listen: false);
                               await storage.clear();
-                              if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/signin', (_) => false);
+                              if (context.mounted) {
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute(builder: (_) => const PassengerWelcomeScreen()),
+                                  (_) => false,
+                                );
+                              }
                             }),
                             _buildFormattedMenuItem(
                               Icons.delete_forever_rounded, 
@@ -293,7 +299,10 @@ class _PassengerProfileScreenState extends State<PassengerProfileScreen> {
                       backgroundColor: Colors.red,
                     ),
                   );
-                  Navigator.of(context).pushNamedAndRemoveUntil('/signin', (_) => false);
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const PassengerWelcomeScreen()),
+                    (_) => false,
+                  );
                 }
               } catch (e) {
                 if (context.mounted) {

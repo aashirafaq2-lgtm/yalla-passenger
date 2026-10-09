@@ -15,6 +15,9 @@ import 'core/services/deferred_link_service.dart';
 import 'features/auth/repositories/auth_repository.dart';
 import 'core/providers/locale_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'features/auth/presentation/passenger_welcome_screen.dart';
+import 'features/auth/presentation/passenger_signin_screen.dart';
+import 'features/passenger/presentation/passenger_main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -100,6 +103,11 @@ class YallaApp extends StatelessWidget {
           ),
         ),
         home: const SplashScreen(),
+        routes: {
+          '/welcome': (context) => const PassengerWelcomeScreen(),
+          '/signin': (context) => const PassengerSignInScreen(),
+          '/home': (context) => const PassengerMainScreen(),
+        },
       ),
     );
   }
