@@ -124,6 +124,15 @@ class SocketService {
     if (_isConnected) socket?.emit('join_ride', {'rideId': rideId});
   }
 
+  void sendMessage(String rideId, String text) {
+    if (!_isConnected || text.trim().isEmpty) return;
+    socket?.emit('send_message', {
+      'rideId': rideId,
+      'text': text.trim(),
+      'senderRole': 'PASSENGER',
+    });
+  }
+
   void disconnect() {
     _currentRideId = null;
     socket?.disconnect();

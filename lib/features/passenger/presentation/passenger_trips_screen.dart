@@ -252,6 +252,25 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
     );
   }
 
+  String _fmtDate(dynamic iso) {
+    if (iso == null) return '--';
+    try {
+      final dt = DateTime.parse(iso.toString()).toLocal();
+      final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '${dt.day} ${months[dt.month - 1]}  $h:$min $amPm';
+    } catch (_) { return iso.toString(); }
+  }
+
+  String _fmtPrice(dynamic val, bool isArabic) {
+    final n = double.tryParse(val?.toString().replaceAll(RegExp(r'[^0-9.]'), '') ?? '') ?? 0;
+    if (n == 0) return isArabic ? '--' : '--';
+    final s = n.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+    return '$s ${isArabic ? "د.ع" : "IQD"}';
+  }
+
   Widget _buildRideCard(dynamic ride) {
     final locale = Provider.of<LocaleProvider>(context);
     final isArabic = locale.isArabic;
@@ -259,11 +278,18 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
     final dynamic rawDriver = ride is Map ? ride['driver'] : null;
     final driverName = rawDriver is Map
         ? '${rawDriver['firstName'] ?? ''} ${rawDriver['lastName'] ?? ''}'.trim()
-        : (isArabic ? 'كابتن الرحلة' : 'Captain Adnan');
-    final price = ride is Map && ride['price'] != null ? '${ride['price']} ${isArabic ? "د.ع" : "IQD"}' : (isArabic ? '١٠,٠٠٠ د.ع' : '10,000 IQD');
-    final date = isArabic ? '١٤ شباط، رحلة سريعة' : 'Feb 14 Saturday roam ride';
-    final from = (ride is Map ? ride['originName'] : null) ?? (isArabic ? 'كركوك، --' : 'Kirkuk, --');
-    final to = (ride is Map ? ride['destinationName'] : null) ?? (isArabic ? 'أربيل، --' : 'Erbil, --');
+        : (ride is Map ? ride['driverName'] : null) ?? (isArabic ? 'كابتن الرحلة' : 'Captain');
+    final driverRating = rawDriver is Map ? (rawDriver['rating'] ?? 5.0) : 5.0;
+    final priceVal = ride is Map ? (ride['finalPrice'] ?? ride['estimatedPrice'] ?? ride['price']) : null;
+    final price = _fmtPrice(priceVal, isArabic);
+    final date = _fmtDate(ride is Map ? (ride['requestedAt'] ?? ride['createdAt']) : null);
+    final from = (ride is Map ? (ride['pickupName'] ?? ride['originName']) : null) ?? (isArabic ? 'موقع الانطلاق' : 'Pickup');
+    final to = (ride is Map ? (ride['dropName'] ?? ride['destinationName']) : null) ?? (isArabic ? 'الوجهة' : 'Destination');
+    final pLat = double.tryParse((ride is Map ? ride['pickupLat'] : null)?.toString() ?? '') ?? 35.46;
+    final pLng = double.tryParse((ride is Map ? ride['pickupLng'] : null)?.toString() ?? '') ?? 44.38;
+    final dLat = double.tryParse((ride is Map ? ride['dropLat'] : null)?.toString() ?? '') ?? 36.19;
+    final dLng = double.tryParse((ride is Map ? ride['dropLng'] : null)?.toString() ?? '') ?? 44.00;
+    final stars = (driverRating is num) ? driverRating.toDouble().clamp(1.0, 5.0) : 5.0;
 
     return GestureDetector(
       onTap: () {
@@ -305,12 +331,12 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                   ),
                   MarkerLayer(markers: [
                     Marker(
-                      point: const LatLng(35.46, 44.38), // Kirkuk approx
+                      point: LatLng(pLat, pLng),
                       width: 20, height: 20,
                       child: _mapDot(Colors.blue),
                     ),
                     Marker(
-                      point: const LatLng(36.19, 44.00), // Erbil approx
+                      point: LatLng(dLat, dLng),
                       width: 20, height: 20,
                       child: _mapDot(Colors.red),
                     ),
@@ -325,39 +351,43 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
             child: Column(
               crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const CircleAvatar(
-                          radius: 18, 
-                          backgroundColor: Color(0xFFF0F0F0), 
-                          child: Icon(Icons.person, size: 22, color: Colors.grey)
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: const Color(0xFFF0F0F0),
+                              child: Text(
+                                driverName.isNotEmpty ? driverName[0].toUpperCase() : 'C',
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              driverName.isEmpty ? (isArabic ? 'كابتن' : 'Captain') : driverName,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Text(driverName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        Row(
+                          children: List.generate(5, (i) => Icon(
+                            i < stars.round() ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: Colors.amber,
+                            size: 15,
+                          )),
+                        ),
                       ],
                     ),
-                    const Row(
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(Icons.star, color: Colors.amber, size: 16),
-                        Icon(Icons.star, color: Colors.amber, size: 16),
-                        Icon(Icons.star, color: Colors.amber, size: 16),
-                        Icon(Icons.star, color: Colors.amber, size: 16),
-                        Icon(Icons.star_border, color: Colors.grey, size: 16),
+                        Text(price, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primaryOrange)),
+                        Text(date, style: const TextStyle(color: Colors.black45, fontSize: 11)),
                       ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(price, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    Text(date, style: const TextStyle(color: Colors.black45, fontSize: 11)),
-                  ],
-                ),
                 const SizedBox(height: 12),
                 const Divider(color: Colors.black12, height: 1),
                 const SizedBox(height: 12),

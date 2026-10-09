@@ -21,11 +21,17 @@ class ApiService {
 
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
+        // Skip auth token lookup for unauthenticated auth endpoints
+        if (options.path.startsWith('/auth/')) {
+          return handler.next(options);
+        }
         if (!options.headers.containsKey('Authorization')) {
-          final token = await _storageService.getToken();
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
+          try {
+            final token = await _storageService.getToken();
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+          } catch (_) {}
         }
         return handler.next(options);
       },

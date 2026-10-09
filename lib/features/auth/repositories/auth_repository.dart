@@ -11,7 +11,7 @@ class AuthRepository {
   Future<bool> login(String phone) async {
     try {
       final response = await _apiService.login(phone);
-      return response.statusCode == 200;
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       return false;
     }
@@ -20,7 +20,7 @@ class AuthRepository {
   Future<bool> registerPassenger({required String phone, required String name, String? age}) async {
     try {
       final response = await _apiService.registerPassenger(phone: phone, name: name, age: age);
-      return response.statusCode == 200;
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       return false;
     }
