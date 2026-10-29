@@ -353,7 +353,7 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
     );
   }
 
-  Widget _buildCityBadge(String value, ValueChanged<String?> onChanged) {
+  Widget _buildCityBadge(String value, ValueChanged<String?> onChanged, [bool isArabic = false]) {
     if (widget.isStaticCity) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
