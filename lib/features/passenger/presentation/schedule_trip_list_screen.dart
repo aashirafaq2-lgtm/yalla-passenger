@@ -16,7 +16,35 @@ class ScheduleTripListScreen extends StatefulWidget {
 class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
   String filterOrigin = 'Kirkuk';
   String filterDest = 'Baghdad';
-  final List<String> cities = ['Kirkuk', 'Baghdad', 'Erbil', 'Basra', 'Sulaymaniyah', 'Najaf', 'Karbala', 'Mosul', 'Dohuk', 'Anbar', 'Babel', 'Wasit'];
+  final List<String> cities = [
+    'Kirkuk', 'Baghdad', 'Erbil', 'Basra', 'Sulaymaniyah',
+    'Najaf', 'Karbala', 'Mosul', 'Dohuk', 'Anbar', 'Babel', 'Wasit'
+  ];
+
+  static const Map<String, String> _cityArabicMap = {
+    'Kirkuk': 'كركوك',
+    'Baghdad': 'بغداد',
+    'Erbil': 'أربيل',
+    'Basra': 'البصرة',
+    'Sulaymaniyah': 'السليمانية',
+    'Najaf': 'النجف',
+    'Karbala': 'كربلاء',
+    'Mosul': 'الموصل',
+    'Dohuk': 'دهوك',
+    'Duhok': 'دهوك',
+    'Anbar': 'الأنبار',
+    'Babel': 'بابل',
+    'Babylon': 'بابل',
+    'Wasit': 'واسط',
+    'Saladin': 'صلاح الدين',
+    'Diyala': 'ديالى',
+    'Maysan': 'ميسان',
+    'Muthanna': 'المثنى',
+    'Qadisiyyah': 'القادسية',
+    'Dhi Qar': 'ذي قار',
+  };
+
+  static String getCityArabic(String city) => _cityArabicMap[city] ?? city;
   bool _isSearching = false;
   final TextEditingController _searchCtrl = TextEditingController();
   List<dynamic> _trips = [];
@@ -462,13 +490,13 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
               fontFamily: isArabic ? 'NotoKufiArabic' : null,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildFilterBadge(filterOrigin, (val) => setState(() => filterOrigin = val!)),
-              const Icon(Icons.arrow_forward, size: 28, color: Colors.black54),
-              _buildFilterBadge(filterDest, (val) => setState(() => filterDest = val!)),
+              _buildFilterBadge(filterOrigin, (val) => setState(() => filterOrigin = val!), isArabic),
+              Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 26, color: AppColors.primaryOrange),
+              _buildFilterBadge(filterDest, (val) => setState(() => filterDest = val!), isArabic),
             ],
           ),
           const SizedBox(height: 16),
@@ -484,7 +512,7 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               onPressed: () {
-                _searchCtrl.text = filterOrigin;
+                _searchCtrl.text = isArabic ? getCityArabic(filterOrigin) : filterOrigin;
                 setState(() {});
                 _loadTrips();
               },
@@ -504,9 +532,9 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
     );
   }
 
-  Widget _buildFilterBadge(String value, ValueChanged<String?> onChanged) {
-     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+  Widget _buildFilterBadge(String value, ValueChanged<String?> onChanged, [bool isArabic = false]) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -515,13 +543,19 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
-          icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.black54),
-          style: const TextStyle(color: Colors.black87, fontSize: 15, fontWeight: FontWeight.bold),
+          icon: const Icon(Icons.keyboard_arrow_down, size: 20, color: Colors.black54),
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            fontFamily: isArabic ? 'NotoKufiArabic' : null,
+          ),
           onChanged: onChanged,
           items: cities.map<DropdownMenuItem<String>>((String item) {
+            final display = isArabic ? getCityArabic(item) : item;
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(item, style: const TextStyle(fontSize: 15)),
+              child: Text(display, style: const TextStyle(fontSize: 15)),
             );
           }).toList(),
         ),

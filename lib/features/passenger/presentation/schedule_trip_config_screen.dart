@@ -33,7 +33,35 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
   bool frontSeat = false;
   late String selectedOrigin;
   late String selectedDestination;
-  final List<String> cities = ['Kirkuk', 'Baghdad', 'Erbil', 'Basra', 'Sulaymaniyah', 'Najaf', 'Karbala', 'Mosul', 'Dohuk', 'Anbar', 'Babel', 'Wasit'];
+  final List<String> cities = [
+    'Kirkuk', 'Baghdad', 'Erbil', 'Basra', 'Sulaymaniyah',
+    'Najaf', 'Karbala', 'Mosul', 'Dohuk', 'Anbar', 'Babel', 'Wasit'
+  ];
+
+  static const Map<String, String> _cityArabicMap = {
+    'Kirkuk': 'كركوك',
+    'Baghdad': 'بغداد',
+    'Erbil': 'أربيل',
+    'Basra': 'البصرة',
+    'Sulaymaniyah': 'السليمانية',
+    'Najaf': 'النجف',
+    'Karbala': 'كربلاء',
+    'Mosul': 'الموصل',
+    'Dohuk': 'دهوك',
+    'Duhok': 'دهوك',
+    'Anbar': 'الأنبار',
+    'Babel': 'بابل',
+    'Babylon': 'بابل',
+    'Wasit': 'واسط',
+    'Saladin': 'صلاح الدين',
+    'Diyala': 'ديالى',
+    'Maysan': 'ميسان',
+    'Muthanna': 'المثنى',
+    'Qadisiyyah': 'القادسية',
+    'Dhi Qar': 'ذي قار',
+  };
+
+  static String getCityArabic(String city) => _cityArabicMap[city] ?? city;
   final TextEditingController _discountCtrl = TextEditingController();
   bool _hasDiscountCode = false;
 
@@ -116,9 +144,9 @@ class _ScheduleTripConfigScreenState extends State<ScheduleTripConfigScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildCityBadge(selectedOrigin, (val) => setState(() => selectedOrigin = val!)),
+                          _buildCityBadge(selectedOrigin, (val) => setState(() => selectedOrigin = val!), isArabic),
                           Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
-                          _buildCityBadge(selectedDestination, (val) => setState(() => selectedDestination = val!)),
+                          _buildCityBadge(selectedDestination, (val) => setState(() => selectedDestination = val!), isArabic),
                         ],
                       ),
                       const SizedBox(height: 25),

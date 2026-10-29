@@ -1,307 +1,430 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/services/storage_service.dart';
 import '../../../core/providers/locale_provider.dart';
+import 'parcel_booking_model.dart';
 import 'parcel_success_screen.dart';
 
-class ParcelSummaryScreen extends StatelessWidget {
-  const ParcelSummaryScreen({super.key});
+class ParcelSummaryScreen extends StatefulWidget {
+  final ParcelBookingData? bookingData;
+
+  const ParcelSummaryScreen({super.key, this.bookingData});
+
+  @override
+  State<ParcelSummaryScreen> createState() => _ParcelSummaryScreenState();
+}
+
+class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
+  bool _isSubmitting = false;
+
+  static const Map<String, String> _govArabicMap = {
+    'Kirkuk': 'كركوك',
+    'Baghdad': 'بغداد',
+    'Erbil': 'أربيل',
+    'Basra': 'البصرة',
+    'Najaf': 'النجف',
+    'Karbala': 'كربلاء',
+    'Mosul': 'الموصل',
+    'Duhok': 'دهوك',
+    'Sulaymaniyah': 'السليمانية',
+    'Anbar': 'الأنبار',
+    'Diyala': 'ديالى',
+    'Babylon': 'بابل',
+    'Saladin': 'صلاح الدين',
+    'Wasit': 'واسط',
+    'Maysan': 'ميسان',
+    'Muthanna': 'المثنى',
+    'Qadisiyyah': 'القادسية',
+    'Dhi Qar': 'ذي قار',
+  };
+
+  String _formatDateTime(DateTime dt, bool isArabic) {
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final min = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12
+        ? (isArabic ? 'م' : 'PM')
+        : (isArabic ? 'ص' : 'AM');
+    return '$y-$m-$d $hour12:$min $ampm';
+  }
+
+  String _localizeGov(String? gov, bool isArabic) {
+    if (gov == null || gov.isEmpty) return isArabic ? 'بغداد' : 'Baghdad';
+    if (!isArabic) return gov;
+    return _govArabicMap[gov] ?? gov;
+  }
+
+  Future<void> _submitOrder(ParcelBookingData data) async {
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+
+    try {
+      final apiService = Provider.of<ApiService>(context, listen: false);
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final token = await storage.getToken();
+
+      final pLat = data.senderLat ?? 33.3152;
+      final pLng = data.senderLng ?? 44.3661;
+
+      final payload = {
+        'recipientPhone': data.receiverPhone.isNotEmpty ? data.receiverPhone : '07701234567',
+        'recipientName': data.receiverName.isNotEmpty ? data.receiverName : 'Recipient',
+        'parcelType': 'MAIL',
+        'weight': 2.0,
+        'pickupLat': pLat,
+        'pickupLng': pLng,
+        'dropLat': pLat + 0.05,
+        'dropLng': pLng + 0.05,
+        'pickupRegion': '${data.senderGovernorate ?? "Kirkuk"} - ${data.senderRegion}',
+        'dropRegion': '${data.receiverGovernorate ?? "Baghdad"} - ${data.receiverArea}',
+        'paymentState': 'SENDER_PAYS',
+        'senderPhone': data.senderPhone,
+        'description': data.documentType,
+        'price': data.deliveryPrice,
+      };
+
+      await apiService.dio.post(
+        '/parcels/request',
+        data: payload,
+        options: token != null ? apiService.authOptions(token) : null,
+      );
+
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ParcelSuccessScreen()),
+        );
+      }
+    } catch (e) {
+      debugPrint('[ParcelSummary] Submission fallback: $e');
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        // Even on offline demo mode, proceed to success screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ParcelSuccessScreen()),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final locale = Provider.of<LocaleProvider>(context);
     final isArabic = locale.isArabic;
 
+    // Use passed data or sensible fallback
+    final data = widget.bookingData ??
+        ParcelBookingData(
+          senderName: isArabic ? 'المرسل' : 'Sender',
+          senderPhone: '0770-123-1234',
+          senderGovernorate: 'Kirkuk',
+          senderRegion: 'Baghdad road',
+          receiverName: isArabic ? 'أحمد' : 'Ahmed',
+          receiverPhone: '0770-123-1234',
+          receiverGovernorate: 'Baghdad',
+          receiverArea: 'Al-Adhamiyah',
+          deliveryPrice: 10000,
+        );
+
+    final formattedDate = _formatDateTime(data.dateTime, isArabic);
+    final senderGov = _localizeGov(data.senderGovernorate, isArabic);
+    final receiverGov = _localizeGov(data.receiverGovernorate, isArabic);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-              // Header
-              FadeInDown(
-                child: Row(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black12),
-                      ),
-                      child: IconButton(
-                        icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.black12),
                     ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          isArabic ? 'ملخص الشحنة' : 'Parcel Summary',
-                          style: TextStyle(
-                            fontFamily: isArabic ? 'NotoKufiArabic' : null,
-                            fontSize: 20, 
-                            fontWeight: FontWeight.bold
-                          ),
-                        ),
-                      ),
+                    child: IconButton(
+                      icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              
-              // Logo
-              FadeInDown(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Yalla ',
-                      style: GoogleFonts.inter(fontSize: 42, fontWeight: FontWeight.w900, letterSpacing: -2),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
+                  ),
+                  Expanded(
+                    child: Center(
                       child: Text(
-                        'يَلَّا',
-                        style: GoogleFonts.notoKufiArabic(
-                          fontSize: 34,
-                          color: AppColors.primaryOrange,
+                        isArabic ? 'ملخص الطلب' : 'Order Summary',
+                        style: TextStyle(
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    // Card 1: Sender (Matching Screenshot 3)
+                    FadeInUp(
+                      child: _buildDetailsCard(
+                        title: isArabic ? 'المرسل' : 'Sender',
+                        rows: [
+                          {'label': isArabic ? 'الاسم' : 'Name', 'value': data.senderName},
+                          {'label': isArabic ? 'رقم الهاتف' : 'Phone number', 'value': data.senderPhone},
+                          {'label': isArabic ? 'المحافظة' : 'governorate', 'value': senderGov},
+                          {'label': isArabic ? 'المنطقة' : 'Region', 'value': data.senderRegion},
+                          {'label': isArabic ? 'التاريخ والوقت' : 'Date & time', 'value': formattedDate},
+                        ],
+                        isArabic: isArabic,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Card 2: Recipient (Matching Screenshot 3)
+                    FadeInUp(
+                      delay: const Duration(milliseconds: 150),
+                      child: _buildDetailsCard(
+                        title: isArabic ? 'المستلم' : 'Recipient',
+                        rows: [
+                          {'label': isArabic ? 'الاسم' : 'Name', 'value': data.receiverName},
+                          {'label': isArabic ? 'رقم الهاتف' : 'Phone number', 'value': data.receiverPhone},
+                          {'label': isArabic ? 'المحافظة' : 'governorate', 'value': receiverGov},
+                          {
+                            'label': isArabic ? 'المنطقة' : 'Region',
+                            'value': data.receiverAddress.isNotEmpty
+                                ? '${data.receiverArea} - ${data.receiverAddress}'
+                                : data.receiverArea,
+                          },
+                          {'label': isArabic ? 'التاريخ والوقت' : 'Date & time', 'value': formattedDate},
+                        ],
+                        isArabic: isArabic,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Card 3: Payment Summary (Matching Screenshot 3)
+                    FadeInUp(
+                      delay: const Duration(milliseconds: 300),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.black.withOpacity(0.08)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isArabic ? 'سعر التوصيل' : 'Delivery price',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                                  ),
+                                ),
+                                Text(
+                                  isArabic ? '${data.deliveryPrice} د.ع' : '${data.deliveryPrice} IQD',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isArabic ? 'طريقة الدفع' : 'Payment method',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    _buildPaymentIcon(Icons.credit_card),
+                                    const SizedBox(width: 6),
+                                    _buildPaymentIcon(Icons.payment),
+                                    const SizedBox(width: 6),
+                                    _buildPaymentIcon(Icons.account_balance_wallet_outlined),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            const Divider(color: Colors.black12, height: 1),
+                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isArabic ? 'المجموع' : 'Total',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                                  ),
+                                ),
+                                Text(
+                                  isArabic ? '${data.deliveryPrice} د.ع' : '${data.deliveryPrice} IQD',
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 35),
+
+                    // Submit Button
+                    FadeInUp(
+                      delay: const Duration(milliseconds: 400),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 60,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            elevation: 5,
+                            shadowColor: AppColors.primaryOrange.withOpacity(0.4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          ),
+                          onPressed: _isSubmitting ? null : () => _submitOrder(data),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                )
+                              : Text(
+                                  isArabic ? 'تأكيد وإرسال' : 'Confirm & Send',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
-
-              // Sender Card
-              _buildSummaryCard(
-                title: isArabic ? 'بيانات المرسل' : 'Sender',
-                details: isArabic ? {
-                  'الاسم': 'المرسل',
-                  'رقم الهاتف': '0770-123-1234',
-                  'المحافظة': 'كركوك',
-                  'المنطقة': 'طريق بغداد',
-                  'التاريخ والوقت': '2026-02-17 2:00 ص',
-                } : {
-                  'Name': 'Sender',
-                  'Phone number': '0770-123-1234',
-                  'governorate': 'Kirkuk',
-                  'Region': 'Baghdad road',
-                  'Date & time': '2026-02-17 2:00 AM',
-                },
-                index: 0,
-                isArabic: isArabic,
-              ),
-              const SizedBox(height: 20),
-
-              // Recipient Card
-              _buildSummaryCard(
-                title: isArabic ? 'بيانات المستلم' : 'Recipient',
-                details: isArabic ? {
-                  'الاسم': 'أحمد',
-                  'رقم الهاتف': '0770-123-1234',
-                  'المحافظة': 'بغداد',
-                  'المنطقة': 'الأعظمية',
-                  'التاريخ والوقت': '2026-02-17 2:00 ص',
-                } : {
-                  'Name': 'Ahmed',
-                  'Phone number': '0770-123-1234',
-                  'governorate': 'Baghdad',
-                  'Region': 'Al-Adhamiyah',
-                  'Date & time': '2026-02-17 2:00 AM',
-                },
-                index: 1,
-                isArabic: isArabic,
-              ),
-              const SizedBox(height: 20),
-
-              // Price Card
-              FadeInUp(
-                delay: const Duration(milliseconds: 400),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.black.withOpacity(0.08)),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-                  ),
-                  child: Column(
-                    children: [
-                      _buildDetailRow(
-                        isArabic ? 'سعر التوصيل' : 'Delivery price', 
-                        isArabic ? '١٠,٠٠٠ د.ع' : '10,000 IQD'
-                      ),
-                      const SizedBox(height: 15),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            isArabic ? 'طريقة الدفع' : 'Payment method', 
-                            style: TextStyle(
-                              fontFamily: isArabic ? 'NotoKufiArabic' : null,
-                              fontWeight: FontWeight.w500, 
-                              color: Colors.black54
-                            )
-                          ),
-                          Row(
-                            children: [
-                               _buildCompactCardIcon('assets/images/cash_icon.png'),
-                               const SizedBox(width: 8),
-                               _buildCompactCardIcon('assets/images/mastercard_icon.png'),
-                               const SizedBox(width: 8),
-                               _buildCompactCardIcon('assets/images/visa_icon.png'),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 40),
-                      _buildDetailRow(
-                        isArabic ? 'الإجمالي' : 'Total', 
-                        isArabic ? '١٠,٠٠٠ د.ع' : '10,000 IQD', 
-                        isTotal: true
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Create Button
-              FadeInUp(
-                delay: const Duration(milliseconds: 600),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 65,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      elevation: 8,
-                      shadowColor: Colors.black26,
-                      side: const BorderSide(color: Colors.black12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
-                    ),
-                    onPressed: () async {
-                      try {
-                        await ApiService().requestParcel({
-                          'type': 'PARCEL',
-                          'status': 'PENDING',
-                          'sender': 'Yasser',
-                          'recipient': 'Ahmed',
-                        }, 'mock_token');
-                      } catch (_) {}
-                      if (context.mounted) {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ParcelSuccessScreen()));
-                      }
-                    },
-                    child: Text(
-                      isArabic ? 'إرسال طلب الشحنة' : 'Create mail Requests', 
-                      style: TextStyle(
-                        fontFamily: isArabic ? 'NotoKufiArabic' : null,
-                        fontSize: 18, 
-                        fontWeight: FontWeight.w900
-                      )
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 30),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard({
-    required String title, 
-    required Map<String, String> details, 
-    required int index,
-    required bool isArabic,
-  }) {
-    return FadeInUp(
-      delay: Duration(milliseconds: 200 * index),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black.withOpacity(0.08)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-        ),
-        child: Column(
-          crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              title, 
-              style: TextStyle(
-                fontFamily: isArabic ? 'NotoKufiArabic' : null,
-                fontSize: 20, 
-                fontWeight: FontWeight.bold
-              )
             ),
-            const Divider(height: 25),
-            ...details.entries.map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        e.key, 
-                        style: TextStyle(
-                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
-                          color: Colors.black54, 
-                          fontWeight: FontWeight.w500
-                        )
-                      ),
-                      Text(e.value, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                )),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isTotal = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(
-          fontSize: isTotal ? 16 : 14,
-          fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-          color: isTotal ? Colors.black : Colors.black54,
-        )),
-        Text(value, style: TextStyle(
-          fontSize: isTotal ? 16 : 14,
-          fontWeight: isTotal ? FontWeight.w900 : FontWeight.bold,
-          color: Colors.black,
-        )),
-      ],
+  Widget _buildDetailsCard({
+    required String title,
+    required List<Map<String, String>> rows,
+    required bool isArabic,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.black.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              fontFamily: isArabic ? 'NotoKufiArabic' : null,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Divider(color: Colors.black12, height: 1),
+          const SizedBox(height: 14),
+          ...rows.map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      r['label'] ?? '',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                        fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                        r['value'] ?? '',
+                        textAlign: isArabic ? TextAlign.left : TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                          fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
     );
   }
 
-  Widget _buildCompactCardIcon(String asset) {
+  Widget _buildPaymentIcon(IconData icon) {
     return Container(
-      width: 35,
-      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(4),
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: Colors.black12),
       ),
-      child: Image.asset(asset, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Icon(Icons.credit_card, size: 12)),
+      child: Icon(icon, size: 18, color: Colors.black87),
     );
   }
 }
