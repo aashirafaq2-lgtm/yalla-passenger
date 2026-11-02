@@ -52,7 +52,7 @@ class SocketService {
       }
 
       final nextSocket = IO.io(
-        'https://api-yalla.aaaj.shop',
+        'https://api.aynalmassar.com',
         IO.OptionBuilder()
             .setTransports(['websocket'])
             .setAuth({'token': token})

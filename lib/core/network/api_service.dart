@@ -8,7 +8,7 @@ class ApiService {
   ApiService() {
     dio = Dio(
       BaseOptions(
-        baseUrl: 'https://api-yalla.aaaj.shop/api',
+        baseUrl: 'https://api.aynalmassar.com/api',
         connectTimeout: const Duration(seconds: 20),
         receiveTimeout: const Duration(seconds: 20),
         headers: {
