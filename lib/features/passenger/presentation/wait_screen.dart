@@ -94,8 +94,8 @@ class _WaitScreenState extends State<WaitScreen>
       await _pollForActiveRide(storageService);
     });
 
-    // ── 60s timeout: no driver found ──
-    Future.delayed(const Duration(seconds: 60), () {
+    // ── 120s timeout helper ──
+    Future.delayed(const Duration(seconds: 120), () {
       if (mounted && !_driverAccepted) {
         _showNoDriverDialog();
       }
@@ -207,13 +207,13 @@ class _WaitScreenState extends State<WaitScreen>
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          isArabic ? 'لا يوجد كباتن متاحين' : 'No Drivers Available',
+          isArabic ? 'طلبك قيد المتابعة' : 'Request In Progress',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         content: Text(
           isArabic
-              ? 'جميع الكباتن مشغولون حالياً. هل تريد إعادة البحث؟'
-              : 'All nearby drivers are currently busy. Would you like to retry?',
+              ? 'طلبك مسجل لدى فريق العمل، هل تود الاستمرار في الانتظار أو الإلغاء؟'
+              : 'Your request has been received by our dispatch team. Would you like to keep waiting or cancel?',
         ),
         actions: [
           TextButton(
@@ -231,10 +231,8 @@ class _WaitScreenState extends State<WaitScreen>
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              setState(() => _driverAccepted = false);
-              _initSocketAndPoll();
             },
-            child: Text(isArabic ? 'إعادة البحث' : 'Retry',
+            child: Text(isArabic ? 'متابعة الانتظار' : 'Keep Waiting',
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -335,7 +333,7 @@ class _WaitScreenState extends State<WaitScreen>
                   child: Column(
                     children: [
                       Text(
-                        isArabic ? 'جاري البحث$dots' : 'Searching$dots',
+                        isArabic ? 'تم استلام طلبك$dots' : 'Request Received$dots',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 22,
@@ -346,8 +344,8 @@ class _WaitScreenState extends State<WaitScreen>
                       const SizedBox(height: 6),
                       Text(
                         isArabic
-                            ? 'نحن نبحث عن أقرب كابتن لك'
-                            : 'Finding the nearest captain for you',
+                            ? 'يقوم فريق الدعم بالتنسيق مع الكابتن وسنتواصل معك لتأكيد الرحلة'
+                            : 'Our team is coordinating your ride and will contact you shortly',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
