@@ -350,7 +350,7 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildInfoItem(Icons.accessible_forward, seats, isArabic ? 'المقاعد' : 'Seats'),
+                _buildInfoItem(Icons.airline_seat_recline_normal_rounded, seats, isArabic ? 'المقاعد' : 'Seats'),
                 _buildInfoItem(Icons.access_time_filled, time, isArabic ? 'الوقت' : 'Time'),
                 _buildInfoItem(Icons.calendar_month, date, isArabic ? 'التاريخ' : 'Date'),
               ],

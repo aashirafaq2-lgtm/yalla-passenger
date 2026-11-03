@@ -40,6 +40,37 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
     super.dispose();
   }
 
+  
+  static const Map<String, String> _cityArabicMap = {
+    'Kirkuk': 'كركوك',
+    'Baghdad': 'بغداد',
+    'Erbil': 'أربيل',
+    'Basra': 'البصرة',
+    'Najaf': 'النجف',
+    'Karbala': 'كربلاء',
+    'Mosul': 'الموصل',
+    'Sulaymaniyah': 'السليمانية',
+    'Duhok': 'دهوك',
+    'Nasiriyah': 'الناصرية',
+    'Amarah': 'العمارة',
+    'Samawah': 'السماوة',
+    'Hillah': 'الحلة',
+    'Kut': 'الكوت',
+    'Diwaniyah': 'الديوانية',
+    'Ramadi': 'الرمادي',
+    'Baqubah': 'بعقوبة',
+    'Anbar': 'الأنبار',
+    'Babel': 'بابل',
+    'Babylon': 'بابل',
+    'Wasit': 'واسط',
+    'Saladin': 'صلاح الدين',
+    'Diyala': 'ديالى',
+    'Maysan': 'ميسان',
+    'Muthanna': 'المثنى',
+    'Qadisiyyah': 'القادسية',
+    'Dhi Qar': 'ذي قار',
+  };
+
   final List<String> cities = [
     'Kirkuk',
     'Baghdad',
@@ -191,7 +222,7 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildInfoItem(Icons.accessible_forward, '4', isArabic ? 'مقاعد' : 'Seats'),
+                          _buildInfoItem(Icons.airline_seat_recline_normal_rounded, '4', isArabic ? 'مقاعد' : 'Seats'),
                           _buildInfoItem(Icons.access_time, selectedTime, isArabic ? 'الوقت' : 'Time'),
                           _buildInfoItem(Icons.calendar_month, selectedDate, isArabic ? 'التاريخ' : 'Date'),
                         ],
@@ -494,7 +525,7 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
           items: items.map<DropdownMenuItem<String>>((String item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(item),
+              child: Text(_cityArabicMap[item] ?? item),
             );
           }).toList(),
         ),
