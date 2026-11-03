@@ -254,8 +254,10 @@ class _ScheduleTripListScreenState extends State<ScheduleTripListScreen> {
                             ),
                           ...List.generate(filtered.length, (index) {
                             final t = filtered[index];
-                            final from = t['fromGovernorate']?['name'] ?? (isArabic ? 'كركوك' : 'Kirkuk');
-                            final to = t['toGovernorate']?['name'] ?? (isArabic ? 'بغداد' : 'Baghdad');
+                            final fromRaw = t['fromGovernorate']?['name'] ?? (isArabic ? 'كركوك' : 'Kirkuk');
+                            final toRaw = t['toGovernorate']?['name'] ?? (isArabic ? 'بغداد' : 'Baghdad');
+                            final from = isArabic ? getCityArabic(fromRaw) : fromRaw;
+                            final to = isArabic ? getCityArabic(toRaw) : toRaw;
                             final seats = (t['availableSeats'] ?? 4).toString();
                             final price = '${t['pricePerSeat'] ?? 15000} ${isArabic ? "د.ع" : "IQD"}';
                             final car = t['carType']?['name'] ?? t['driver']?['vehicle']?['model'] ?? 'Dodge Charger';

@@ -212,9 +212,9 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildCityBadge(selectedOrigin, cities, (val) => setState(() => selectedOrigin = val!)),
+                          _buildCityBadge(selectedOrigin, cities, (val) => setState(() => selectedOrigin = val!), isArabic),
                           Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
-                          _buildCityBadge(selectedDestination, cities, (val) => setState(() => selectedDestination = val!)),
+                          _buildCityBadge(selectedDestination, cities, (val) => setState(() => selectedDestination = val!), isArabic),
                         ],
                       ),
                       const SizedBox(height: 15),
@@ -430,7 +430,7 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
     );
   }
 
-  Widget _buildCityBadge(String value, List<String> items, ValueChanged<String?> onChanged) {
+  Widget _buildCityBadge(String value, List<String> items, ValueChanged<String?> onChanged, [bool isArabic = false]) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
@@ -448,7 +448,7 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
           items: items.map<DropdownMenuItem<String>>((String item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(item, style: const TextStyle(fontSize: 16, color: Colors.white)),
+              child: Text(isArabic ? (_cityArabicMap[item] ?? item) : item, style: TextStyle(fontSize: 16, color: Colors.white, fontFamily: isArabic ? 'NotoKufiArabic' : null)),
             );
           }).toList(),
         ),

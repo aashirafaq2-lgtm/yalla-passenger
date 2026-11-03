@@ -1,7 +1,7 @@
 name: yalla_passenger
 description: "Yalla - Ride & Deliver Passenger App"
 publish_to: 'none'
-version: 1.6.4+33
+version: 1.6.4+34
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

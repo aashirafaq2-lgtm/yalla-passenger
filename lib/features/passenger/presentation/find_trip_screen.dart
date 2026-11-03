@@ -540,9 +540,10 @@ class _FindTripScreenState extends State<FindTripScreen> {
             onChanged: onChanged,
             items: governorates.map<DropdownMenuItem<String>>((dynamic gov) {
               final id = gov['id']?.toString() ?? '';
+              final rawName = gov['name']?.toString() ?? id;
               final displayName = isArabic
-                  ? (gov['nameAr'] ?? gov['name'] ?? id)
-                  : (gov['name'] ?? id);
+                  ? (gov['nameAr'] ?? _getGovArabic(rawName))
+                  : rawName;
               return DropdownMenuItem<String>(
                 value: id,
                 child: Text(
