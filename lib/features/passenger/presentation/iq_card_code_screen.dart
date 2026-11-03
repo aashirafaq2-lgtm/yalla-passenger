@@ -42,12 +42,13 @@ class _IQCardCodeScreenState extends State<IQCardCodeScreen> {
       final token = await storage.getToken();
 
       if (token == null || token.isEmpty) throw StateError('Please sign in again.');
-      await api.topUpWallet(code, token);
+      final res = await api.topUpWallet(code, token);
+      final num? addedAmount = res.data?['amount'] as num?;
 
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const WalletSuccessScreen()),
+          MaterialPageRoute(builder: (_) => WalletSuccessScreen(amount: addedAmount)),
         );
       }
     } catch (e) {

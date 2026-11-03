@@ -30,6 +30,35 @@ class _FindTripScreenState extends State<FindTripScreen> {
   double? _selectedLat;
   double? _selectedLng;
 
+  static const Map<String, String> _govArabicMap = {
+    'Kirkuk': 'كركوك',
+    'Baghdad': 'بغداد',
+    'Erbil': 'أربيل',
+    'Basra': 'البصرة',
+    'Sulaymaniyah': 'السليمانية',
+    'Najaf': 'النجف',
+    'Karbala': 'كربلاء',
+    'Mosul': 'الموصل',
+    'Dohuk': 'دهوك',
+    'Duhok': 'دهوك',
+    'Anbar': 'الأنبار',
+    'Babel': 'بابل',
+    'Babylon': 'بابل',
+    'Wasit': 'واسط',
+    'Saladin': 'صلاح الدين',
+    'Diyala': 'ديالى',
+    'Maysan': 'ميسان',
+    'Missan': 'ميسان',
+    'Muthanna': 'المثنى',
+    'Qadisiyyah': 'القادسية',
+    'Qadisiyah': 'القادسية',
+    'Al-Qadisiyah': 'القادسية',
+    'Al-Qadisiyyah': 'القادسية',
+    'Dhi Qar': 'ذي قار',
+    'Thiqar': 'ذي قار',
+  };
+  static String _getGovArabic(String name) => _govArabicMap[name] ?? name;
+
   // Fallback: all 18 Iraqi governorates — used when the API call fails
   static const List<Map<String, String>> _fallbackGovernorates = [
     {'id': 'gov_baghdad',       'name': 'Baghdad',       'nameAr': 'بغداد'},
