@@ -69,16 +69,40 @@ class _PassengerOtpScreenState extends State<PassengerOtpScreen> {
     }
   }
 
+  Future<void> _pasteFromClipboard() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text ?? '';
+      final digits = text.replaceAll(RegExp(r'\D'), '');
+      if (digits.isNotEmpty) {
+        for (int i = 0; i < _otpLength && i < digits.length; i++) {
+          _controllers[i].text = digits[i];
+        }
+        setState(() {});
+        if (_otp.length == _otpLength) {
+          _dismissKeyboard();
+          _verify();
+        } else if (digits.length < _otpLength) {
+          _focusNodes[digits.length].requestFocus();
+        }
+      }
+    } catch (_) {}
+  }
+
   void _onOtpChanged(String val, int index) {
     if (val.length > 1) {
       final digits = val.replaceAll(RegExp(r'\D'), '');
       for (int i = 0; i < _otpLength && i < digits.length; i++) {
         _controllers[i].text = digits[i];
       }
-      final nextFocus = digits.length < _otpLength ? digits.length : _otpLength - 1;
-      _focusNodes[nextFocus].requestFocus();
       setState(() {});
-      if (_otp.length == _otpLength) _verify();
+      if (_otp.length == _otpLength) {
+        _dismissKeyboard();
+        _verify();
+      } else {
+        final nextFocus = digits.length < _otpLength ? digits.length : _otpLength - 1;
+        _focusNodes[nextFocus].requestFocus();
+      }
       return;
     }
 
@@ -89,7 +113,12 @@ class _PassengerOtpScreenState extends State<PassengerOtpScreen> {
         _dismissKeyboard();
         if (_otp.length == _otpLength) _verify();
       }
+    } else {
+      if (index > 0) {
+        _focusNodes[index - 1].requestFocus();
+      }
     }
+    setState(() {});
   }
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event, int index) {
@@ -99,6 +128,7 @@ class _PassengerOtpScreenState extends State<PassengerOtpScreen> {
         index > 0) {
       _controllers[index - 1].clear();
       _focusNodes[index - 1].requestFocus();
+      setState(() {});
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -192,8 +222,28 @@ class _PassengerOtpScreenState extends State<PassengerOtpScreen> {
                                       }),
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
-                                  GestureDetector(
+                                  const SizedBox(height: 16),
+                                   TextButton.icon(
+                                     onPressed: _pasteFromClipboard,
+                                     icon: const Icon(Icons.content_paste_rounded, size: 18, color: AppColors.primaryOrange),
+                                     label: const Text(
+                                       'Paste Code',
+                                       style: TextStyle(
+                                         fontSize: 14,
+                                         fontWeight: FontWeight.w600,
+                                         color: AppColors.primaryOrange,
+                                       ),
+                                     ),
+                                     style: TextButton.styleFrom(
+                                       backgroundColor: AppColors.primaryOrange.withOpacity(0.08),
+                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                       shape: RoundedRectangleBorder(
+                                         borderRadius: BorderRadius.circular(20),
+                                       ),
+                                     ),
+                                   ),
+                                   const SizedBox(height: 12),
+                                   GestureDetector(
                                     onTap: _dismissKeyboard,
                                     child: const Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -319,8 +369,12 @@ class _OtpBox extends StatelessWidget {
             focusNode: focusNode,
             textAlign: TextAlign.center,
             keyboardType: TextInputType.number,
-            maxLength: 1,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            maxLength: 4,
+            enableInteractiveSelection: true,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(4),
+            ],
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
