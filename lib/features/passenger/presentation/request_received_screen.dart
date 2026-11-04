@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
@@ -6,7 +7,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/locale_provider.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/services/socket_service.dart';
+import '../../../core/services/sound_service.dart';
 import 'passenger_main_screen.dart';
+import 'active_ride_screen.dart';
 
 enum ManualBookingType {
   findTrip,
@@ -32,6 +36,101 @@ class RequestReceivedScreen extends StatefulWidget {
 
 class _RequestReceivedScreenState extends State<RequestReceivedScreen> {
   bool _isCancelling = false;
+  bool _driverConfirmed = false;
+  Map<String, dynamic>? _assignedDriverData;
+  Timer? _pollingTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToDriverAssignment();
+    _startStatusPolling();
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _listenToDriverAssignment() {
+    final socketService = Provider.of<SocketService>(context, listen: false);
+
+    // Join room for this ride if requestId exists
+    if (widget.requestId != null && widget.requestId!.isNotEmpty) {
+      socketService.joinRide(widget.requestId!);
+    }
+
+    // Listen to ride_accepted event
+    final originalOnRideAccepted = socketService.onRideAccepted;
+    socketService.onRideAccepted = (data) {
+      originalOnRideAccepted?.call(data);
+      if (!mounted) return;
+
+      final incomingRideId = data is Map ? (data['rideId'] ?? data['id'])?.toString() : null;
+      if (widget.requestId != null && incomingRideId != null && incomingRideId != widget.requestId) {
+        return;
+      }
+
+      _onDriverAssignedSuccess(data is Map ? Map<String, dynamic>.from(data) : {});
+    };
+  }
+
+  void _startStatusPolling() {
+    // Also poll active ride status every 5 seconds as fallback
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (!mounted || _driverConfirmed) return;
+      try {
+        final api = Provider.of<ApiService>(context, listen: false);
+        final storage = Provider.of<StorageService>(context, listen: false);
+        final token = await storage.getToken();
+        if (token == null) return;
+
+        final res = await api.getActiveRide(token);
+        if (res.statusCode == 200 && res.data?['activeRide'] != null) {
+          final activeRide = Map<String, dynamic>.from(res.data['activeRide']);
+          final status = activeRide['status']?.toString();
+          final rideId = (activeRide['id'] ?? activeRide['rideId'])?.toString();
+
+          if (widget.requestId != null && rideId != widget.requestId) return;
+
+          if (status == 'ACCEPTED' || status == 'ARRIVED' || status == 'PICKED_UP' || status == 'ONGOING') {
+            _onDriverAssignedSuccess(activeRide);
+          }
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _onDriverAssignedSuccess(Map<String, dynamic> data) {
+    if (_driverConfirmed || !mounted) return;
+
+    _pollingTimer?.cancel();
+    SoundService().playRideAccepted();
+
+    setState(() {
+      _driverConfirmed = true;
+      _assignedDriverData = data;
+    });
+
+    // Provide brief visual confirmation on step 3 before transitioning to live map
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (!mounted) return;
+      final payload = Map<String, dynamic>.from(_assignedDriverData ?? {});
+      payload['id'] = payload['id'] ?? payload['rideId'] ?? widget.requestId;
+      payload['rideId'] = payload['id'];
+      if (widget.extraData != null) {
+        payload.addAll(widget.extraData!);
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ActiveRideScreen(rideData: payload),
+        ),
+      );
+    });
+  }
 
   String _getSubheading(bool isArabic) {
     switch (widget.bookingType) {
@@ -322,33 +421,41 @@ class _RequestReceivedScreenState extends State<RequestReceivedScreen> {
                           isArabic: isArabic,
                         ),
 
-                        // Step 2: Finding a suitable driver (In progress - Orange ring)
+                        // Step 2: Finding a suitable driver
                         _buildStepItem(
-                          icon: Icons.radio_button_checked,
+                          icon: _driverConfirmed ? Icons.check : Icons.radio_button_checked,
                           iconBgColor: AppColors.primaryOrange,
                           iconColor: Colors.white,
                           title: isArabic ? 'جاري البحث عن سائق مناسب' : 'Finding a suitable driver',
-                          badgeText: isArabic ? 'قيد التنفيذ' : 'In progress',
-                          badgeColor: const Color(0xFFFEF3C7),
+                          badgeText: _driverConfirmed ? null : (isArabic ? 'قيد التنفيذ' : 'In progress'),
+                          badgeColor: _driverConfirmed ? null : const Color(0xFFFEF3C7),
                           badgeTextColor: const Color(0xFFD97706),
-                          desc: _getFindingDriverText(isArabic),
+                          desc: _driverConfirmed
+                              ? (isArabic ? 'تم العثور على السائق المناسب!' : 'Matching driver found!')
+                              : _getFindingDriverText(isArabic),
                           hasConnector: true,
-                          connectorActive: false,
+                          connectorActive: _driverConfirmed,
                           isArabic: isArabic,
                         ),
 
-                        // Step 3: Driver confirmed (Waiting - Gray ring)
+                        // Step 3: Driver confirmed
                         _buildStepItem(
-                          icon: Icons.radio_button_unchecked,
-                          iconBgColor: Colors.white,
-                          iconColor: const Color(0xFF9CA3AF),
+                          icon: _driverConfirmed ? Icons.check : Icons.radio_button_unchecked,
+                          iconBgColor: _driverConfirmed ? AppColors.primaryOrange : Colors.white,
+                          iconColor: _driverConfirmed ? Colors.white : const Color(0xFF9CA3AF),
                           title: isArabic ? 'تأكيد السائق' : 'Driver confirmed',
-                          badgeText: isArabic ? 'في الانتظار' : 'Waiting',
-                          badgeColor: const Color(0xFFF3F4F6),
-                          badgeTextColor: const Color(0xFF6B7280),
-                          desc: isArabic
-                              ? 'سيتم تعيين السائق فور العثور على أنسب خيار.'
-                              : 'A driver will be assigned once a suitable match is found.',
+                          badgeText: _driverConfirmed
+                              ? (isArabic ? 'تم التأكيد' : 'Confirmed')
+                              : (isArabic ? 'في الانتظار' : 'Waiting'),
+                          badgeColor: _driverConfirmed ? const Color(0xFFDCFCE7) : const Color(0xFFF3F4F6),
+                          badgeTextColor: _driverConfirmed ? const Color(0xFF16A34A) : const Color(0xFF6B7280),
+                          desc: _driverConfirmed
+                              ? (isArabic
+                                  ? 'تم تأكيد السائق بنجاح! جاري الانتقال إلى الخريطة...'
+                                  : 'Driver confirmed! Navigating to live map...')
+                              : (isArabic
+                                  ? 'سيتم تعيين السائق فور العثور على أنسب خيار.'
+                                  : 'A driver will be assigned once a suitable match is found.'),
                           hasConnector: false,
                           connectorActive: false,
                           isArabic: isArabic,
