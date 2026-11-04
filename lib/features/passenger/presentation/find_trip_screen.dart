@@ -526,8 +526,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                         final response = await apiService.dio.post(
                           '/bookings/create',
                           data: {
-                            'type': 'SCHEDULED',
-                            'tripId': 'mock_trip_id',
+                            'type': 'INSTANT_RIDE',
                             'seatsBooked': seats,
                             'frontSeat': frontSeat,
                             'totalPrice': grandTotal,
