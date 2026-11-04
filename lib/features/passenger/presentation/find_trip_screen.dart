@@ -1,3 +1,4 @@
+import 'request_received_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
@@ -543,7 +544,17 @@ class _FindTripScreenState extends State<FindTripScreen> {
                           if (!context.mounted) return;
                           final ride = response.data['ride'] ?? response.data['booking'];
                           final rideMap = ride is Map ? Map<String, dynamic>.from(ride) : null;
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => WaitScreen(rideData: rideMap)));
+                          final reqId = (rideMap != null && rideMap['id'] != null) ? rideMap['id'].toString() : null;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RequestReceivedScreen(
+            bookingType: ManualBookingType.findTrip,
+            requestId: reqId,
+            extraData: rideMap,
+          ),
+        ),
+      );
                         }
                       } catch (e) {
                         if (!context.mounted) return;

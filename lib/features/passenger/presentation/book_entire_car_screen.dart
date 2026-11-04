@@ -1,3 +1,4 @@
+import 'request_received_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
@@ -433,7 +434,14 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
   }
 
   void _showSuccess() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const BookEntireCarSuccessScreen()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const RequestReceivedScreen(
+          bookingType: ManualBookingType.entireCar,
+        ),
+      ),
+    );
   }
 
   String _formatIqd(num amount) {

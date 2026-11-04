@@ -1,3 +1,4 @@
+import 'request_received_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
@@ -98,7 +99,7 @@ class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
         setState(() => _isSubmitting = false);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const ParcelSuccessScreen()),
+          MaterialPageRoute(builder: (_) => const RequestReceivedScreen(bookingType: ManualBookingType.parcel)),
         );
       }
     } catch (e) {
@@ -108,7 +109,7 @@ class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
         // Even on offline demo mode, proceed to success screen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const ParcelSuccessScreen()),
+          MaterialPageRoute(builder: (_) => const RequestReceivedScreen(bookingType: ManualBookingType.parcel)),
         );
       }
     }
