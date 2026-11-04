@@ -84,6 +84,32 @@ class _FindTripScreenState extends State<FindTripScreen> {
   ];
 
   @override
+  
+  Future<void> _fetchRoutePricing() async {
+    if (selectedOriginId == null || selectedDestinationId == null) return;
+    setState(() => _isLoadingPrice = true);
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final res = await api.getRoutePricing('FIND_TRIP', origin: selectedOriginId, destination: selectedDestinationId);
+      if (res.statusCode == 200 && res.data != null && res.data['routes'] != null) {
+        final List routes = res.data['routes'];
+        if (routes.isNotEmpty) {
+          final matched = routes.first;
+          if (mounted && matched['totalPrice'] != null) {
+            setState(() {
+              _routeSeatPrice = (matched['totalPrice'] as num).toInt();
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching route pricing: ' + e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoadingPrice = false);
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     _loadGovernorates();

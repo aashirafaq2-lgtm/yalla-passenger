@@ -30,6 +30,32 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
   bool _hasDiscountCode = false;
 
   @override
+  
+  Future<void> _fetchRoutePrice() async {
+    if (selectedOrigin.isEmpty || selectedDestination.isEmpty) return;
+    setState(() => _isLoadingPrice = true);
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final res = await api.getRoutePricing('ENTIRE_CAR', origin: selectedOrigin, destination: selectedDestination);
+      if (res.statusCode == 200 && res.data != null && res.data['routes'] != null) {
+        final List routes = res.data['routes'];
+        if (routes.isNotEmpty) {
+          final matched = routes.first;
+          if (mounted && matched['totalPrice'] != null) {
+            setState(() {
+              _dynamicPrice = matched['totalPrice'] as num;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching entire car route price: ' + e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoadingPrice = false);
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     _fetchRoutePrice();
