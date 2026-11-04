@@ -29,6 +29,8 @@ class _FindTripScreenState extends State<FindTripScreen> {
   String _selectedLocationName = 'Choose Your location';
   double? _selectedLat;
   double? _selectedLng;
+  int _routeSeatPrice = 20000;
+  bool _isLoadingPrice = false;
 
   static const Map<String, String> _govArabicMap = {
     'Kirkuk': 'كركوك',
@@ -194,12 +196,12 @@ class _FindTripScreenState extends State<FindTripScreen> {
                       // Source to Destination
                       Row(
                         children: [
-                          _buildDropdown(selectedOriginId, (val) => setState(() => selectedOriginId = val!)),
+                          _buildDropdown(selectedOriginId, (val) { setState(() => selectedOriginId = val!); _fetchRoutePricing(); }),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             child: Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
                           ),
-                          _buildDropdown(selectedDestinationId, (val) => setState(() => selectedDestinationId = val!)),
+                          _buildDropdown(selectedDestinationId, (val) { setState(() => selectedDestinationId = val!); _fetchRoutePricing(); }),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -405,7 +407,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                   ),
                   child: Builder(
                     builder: (context) {
-                      const int seatPrice = 20000;
+                      final int seatPrice = _routeSeatPrice;
                       final int frontSeatPrice = frontSeat ? 5250 : 0;
                       final int totalSeatsPrice = seats * seatPrice;
                       final int grandTotal = totalSeatsPrice + frontSeatPrice;

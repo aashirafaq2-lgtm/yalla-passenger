@@ -23,12 +23,16 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
   String selectedCarType = 'Dodge Charger';
   String selectedDate = '14/2/2026';
   String selectedTime = '2:00 PM';
+  num _dynamicPrice = 75000;
+  bool _isRouteActive = true;
+  bool _isLoadingPrice = false;
   final TextEditingController _discountCtrl = TextEditingController();
   bool _hasDiscountCode = false;
 
   @override
   void initState() {
     super.initState();
+    _fetchRoutePrice();
     _discountCtrl.addListener(() {
       setState(() => _hasDiscountCode = _discountCtrl.text.trim().isNotEmpty);
     });
@@ -212,9 +216,9 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildCityBadge(selectedOrigin, cities, (val) => setState(() => selectedOrigin = val!), isArabic),
+                          _buildCityBadge(selectedOrigin, cities, (val) { setState(() => selectedOrigin = val!); _fetchRoutePrice(); }, isArabic),
                           Icon(isArabic ? Icons.arrow_back : Icons.arrow_forward, size: 30),
-                          _buildCityBadge(selectedDestination, cities, (val) => setState(() => selectedDestination = val!), isArabic),
+                          _buildCityBadge(selectedDestination, cities, (val) { setState(() => selectedDestination = val!); _fetchRoutePrice(); }, isArabic),
                         ],
                       ),
                       const SizedBox(height: 15),
@@ -232,7 +236,12 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildDetailItem(isArabic ? 'السعر' : 'Price', isArabic ? '75,000 د.ع' : '75,000 IQD'),
+                          _buildDetailItem(
+                            isArabic ? 'السعر' : 'Price',
+                            _isLoadingPrice
+                                ? (isArabic ? '...' : '...')
+                                : (isArabic ? '${_formatIqd(_dynamicPrice)} د.ع' : '${_formatIqd(_dynamicPrice)} IQD'),
+                          ),
                           _buildDetailItem(isArabic ? 'السيارة' : 'Car', selectedCarType, isRight: true, icon: Icons.directions_car),
                         ],
                       ),
@@ -365,7 +374,7 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
           'type': 'PRIVATE_CAR',
           'pickupName': selectedOrigin,
           'dropName': selectedDestination,
-          'totalPrice': 75000,
+          'totalPrice': _dynamicPrice,
           'carType': selectedCarType,
           'date': selectedDate,
           'time': selectedTime,
@@ -399,6 +408,13 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
 
   void _showSuccess() {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const BookEntireCarSuccessScreen()));
+  }
+
+  String _formatIqd(num amount) {
+    return amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
   }
 
   Widget _buildDateTimeCard(String label, String value, VoidCallback onTap, [bool isArabic = false]) {

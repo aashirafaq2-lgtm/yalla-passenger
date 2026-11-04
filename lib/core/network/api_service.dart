@@ -162,6 +162,15 @@ class ApiService {
     return await dio.get('/chat/$rideId', options: Options(headers: {'Authorization': 'Bearer $token'}));
   }
 
+  // Route-based Pricing & Availability
+  Future<Response> getRoutePricing(String category, {String? origin, String? destination}) async {
+    return await dio.get('/general/route-pricing', queryParameters: {
+      'category': category,
+      if (origin != null) 'origin': origin,
+      if (destination != null) 'destination': destination,
+    });
+  }
+
   // Governorates
   Future<Response> getGovernorates() async {
     return await dio.get('/trips/governorates');
