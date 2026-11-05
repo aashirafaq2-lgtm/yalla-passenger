@@ -140,6 +140,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                 : governorates[0]['id']?.toString();
             isLoading = false;
           });
+          _fetchRoutePricing();
           return;
         }
       }
@@ -151,6 +152,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
       selectedDestinationId = _fallbackGovernorates[1]['id'];
       isLoading = false;
     });
+    _fetchRoutePricing();
   }
 
   @override
@@ -510,7 +512,7 @@ class _FindTripScreenState extends State<FindTripScreen> {
                         }
 
                         final apiService = Provider.of<ApiService>(context, listen: false);
-                        final int seatPrice = 20000;
+                        final int seatPrice = _routeSeatPrice;
                         final int frontSeatPrice = frontSeat ? 5250 : 0;
                         final int grandTotal = (seats * seatPrice) + frontSeatPrice;
 

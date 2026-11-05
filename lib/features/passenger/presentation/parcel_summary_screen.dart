@@ -20,6 +20,39 @@ class ParcelSummaryScreen extends StatefulWidget {
 
 class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
   bool _isSubmitting = false;
+  int? _dynamicDeliveryPrice;
+  bool _isLoadingPrice = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchParcelPricing();
+  }
+
+  Future<void> _fetchParcelPricing() async {
+    final senderGov = widget.bookingData?.senderGovernorate ?? 'Kirkuk';
+    final receiverGov = widget.bookingData?.receiverGovernorate ?? 'Baghdad';
+    setState(() => _isLoadingPrice = true);
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final res = await api.getRoutePricing('PARCEL', origin: senderGov, destination: receiverGov);
+      if (res.statusCode == 200 && res.data != null && res.data['routes'] != null) {
+        final List routes = res.data['routes'];
+        if (routes.isNotEmpty) {
+          final matched = routes.first;
+          if (mounted && matched['totalPrice'] != null) {
+            setState(() {
+              _dynamicDeliveryPrice = (matched['totalPrice'] as num).toInt();
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[ParcelSummary] Error fetching route pricing: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingPrice = false);
+    }
+  }
 
   static const Map<String, String> _govArabicMap = {
     'Kirkuk': 'كركوك',
@@ -72,6 +105,7 @@ class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
       final pLat = data.senderLat ?? 33.3152;
       final pLng = data.senderLng ?? 44.3661;
 
+      final effectivePrice = _dynamicDeliveryPrice ?? data.deliveryPrice;
       final payload = {
         'recipientPhone': data.receiverPhone.isNotEmpty ? data.receiverPhone : '07701234567',
         'recipientName': data.receiverName.isNotEmpty ? data.receiverName : 'Recipient',
@@ -86,7 +120,7 @@ class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
         'paymentState': 'SENDER_PAYS',
         'senderPhone': data.senderPhone,
         'description': data.documentType,
-        'price': data.deliveryPrice,
+        'price': effectivePrice,
       };
 
       await apiService.dio.post(
@@ -137,6 +171,7 @@ class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
     final formattedDate = _formatDateTime(data.dateTime, isArabic);
     final senderGov = _localizeGov(data.senderGovernorate, isArabic);
     final receiverGov = _localizeGov(data.receiverGovernorate, isArabic);
+    final displayPrice = _dynamicDeliveryPrice ?? data.deliveryPrice;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -252,7 +287,7 @@ class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
                                   ),
                                 ),
                                 Text(
-                                  isArabic ? '${data.deliveryPrice} د.ع' : '${data.deliveryPrice} IQD',
+                                  isArabic ? '$displayPrice د.ع' : '$displayPrice IQD',
                                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                                 ),
                               ],
@@ -296,7 +331,7 @@ class _ParcelSummaryScreenState extends State<ParcelSummaryScreen> {
                                   ),
                                 ),
                                 Text(
-                                  isArabic ? '${data.deliveryPrice} د.ع' : '${data.deliveryPrice} IQD',
+                                  isArabic ? '$displayPrice د.ع' : '$displayPrice IQD',
                                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                 ),
                               ],
