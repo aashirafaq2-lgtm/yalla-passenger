@@ -727,7 +727,14 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                         Expanded(
                           child: InkWell(
                             onTap: () {
-                              _showDriverDetailsModal(ride);
+                              if (isApproved) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => TripDetailsScreen(rideData: ride)),
+                                );
+                              } else {
+                                _showDriverDetailsModal(ride);
+                              }
                             },
                             child: Row(
                               children: [

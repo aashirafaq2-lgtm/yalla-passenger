@@ -123,7 +123,7 @@ class TripDetailsScreen extends StatelessWidget {
                   Expanded(
                     child: Center(
                       child: Text(
-                        isArabic ? 'تفاصيل الرحلة' : 'Trip Details',
+                        isArabic ? 'تفاصيل الطلب' : 'Details of Order',
                         style: TextStyle(
                           fontFamily: isArabic ? 'NotoKufiArabic' : null,
                           fontSize: 20,
