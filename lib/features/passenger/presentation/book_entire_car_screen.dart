@@ -259,18 +259,15 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      // Price and Car
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildDetailItem(
-                            isArabic ? 'السعر' : 'Price',
-                            _isLoadingPrice
-                                ? (isArabic ? '...' : '...')
-                                : (isArabic ? '${_formatIqd(_dynamicPrice)} د.ع' : '${_formatIqd(_dynamicPrice)} IQD'),
-                          ),
-                          _buildDetailItem(isArabic ? 'السيارة' : 'Car', selectedCarType, isRight: true, icon: Icons.directions_car),
-                        ],
+                      // Price
+                      Align(
+                        alignment: isArabic ? Alignment.centerRight : Alignment.centerLeft,
+                        child: _buildDetailItem(
+                          isArabic ? 'السعر' : 'Price',
+                          _isLoadingPrice
+                              ? (isArabic ? '...' : '...')
+                              : (isArabic ? '${_formatIqd(_dynamicPrice)} د.ع' : '${_formatIqd(_dynamicPrice)} IQD'),
+                        ),
                       ),
                       const SizedBox(height: 20),
                       // Location Buttons
@@ -287,12 +284,7 @@ class _BookEntireCarScreenState extends State<BookEntireCarScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Car Type Dropdown
-              FadeInUp(
-                delay: const Duration(milliseconds: 300),
-                child: _buildDropdown(selectedCarType, carTypes, (val) => setState(() => selectedCarType = val!)),
-              ),
-              const SizedBox(height: 20),
+
 
               // Discount Code
               FadeInUp(
