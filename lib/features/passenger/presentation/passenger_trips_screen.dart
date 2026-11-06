@@ -626,84 +626,90 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                 // ── Status Banner (Header) ──
                 if (isCompleted) ...[
                   // STAGE 4: Trip Completed (Image 1 Left)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF86EFAC).withOpacity(0.5)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 28),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isArabic ? 'اكتملت الرحلة' : 'Trip Completed',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF15803D)),
-                              ),
-                              Text(
-                                isArabic ? 'تم إكمال الرحلة بنجاح.' : 'The trip has been successfully completed.',
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF166534)),
-                              ),
-                            ],
+                  FadeInDown(
+                    duration: const Duration(milliseconds: 350),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF86EFAC).withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isArabic ? 'اكتملت الرحلة' : 'Trip Completed',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF15803D)),
+                                ),
+                                Text(
+                                  isArabic ? 'تم إكمال الرحلة بنجاح.' : 'The trip has been successfully completed.',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF166534)),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
                 ] else if (isCancelled) ...[
                   // STAGE 5: Cancelled (Image 1 Center / Right)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isCancelledByDriver ? const Color(0xFFFEF2F2) : const Color(0xFFFFF7ED),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isCancelledByDriver 
-                            ? const Color(0xFFFECACA).withOpacity(0.6)
-                            : const Color(0xFFFED7AA).withOpacity(0.6),
+                  FadeInDown(
+                    duration: const Duration(milliseconds: 350),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isCancelledByDriver ? const Color(0xFFFEF2F2) : const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isCancelledByDriver 
+                              ? const Color(0xFFFECACA).withOpacity(0.6)
+                              : const Color(0xFFFED7AA).withOpacity(0.6),
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isCancelledByDriver ? Icons.cancel_rounded : Icons.cancel_outlined,
-                          color: isCancelledByDriver ? const Color(0xFFEF4444) : const Color(0xFFF97316),
-                          size: 28,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isCancelledByDriver
-                                    ? (isArabic ? 'ألغيت الرحلة' : 'Trip Cancelled')
-                                    : (isArabic ? 'ألغيت الرحلة بواسطتك' : 'Trip Cancelled by You'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: isCancelledByDriver ? const Color(0xFFB91C1C) : const Color(0xFFC2410C),
-                                ),
-                              ),
-                              Text(
-                                isCancelledByDriver
-                                    ? (isArabic ? 'تم إلغاء هذه الرحلة من قبل السائق.' : 'This trip was cancelled by the driver.')
-                                    : (isArabic ? 'لقد قمت بإلغاء هذه الرحلة.' : 'You have cancelled this trip.'),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isCancelledByDriver ? const Color(0xFF991B1B) : const Color(0xFF9A3412),
-                                ),
-                              ),
-                            ],
+                      child: Row(
+                        children: [
+                          Icon(
+                            isCancelledByDriver ? Icons.cancel_rounded : Icons.cancel_outlined,
+                            color: isCancelledByDriver ? const Color(0xFFEF4444) : const Color(0xFFF97316),
+                            size: 28,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isCancelledByDriver
+                                      ? (isArabic ? 'ألغيت الرحلة' : 'Trip Cancelled')
+                                      : (isArabic ? 'ألغيت الرحلة بواسطتك' : 'Trip Cancelled by You'),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: isCancelledByDriver ? const Color(0xFFB91C1C) : const Color(0xFFC2410C),
+                                  ),
+                                ),
+                                Text(
+                                  isCancelledByDriver
+                                      ? (isArabic ? 'تم إلغاء هذه الرحلة من قبل السائق.' : 'This trip was cancelled by the driver.')
+                                      : (isArabic ? 'لقد قمت بإلغاء هذه الرحلة.' : 'You have cancelled this trip.'),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isCancelledByDriver ? const Color(0xFF991B1B) : const Color(0xFF9A3412),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
