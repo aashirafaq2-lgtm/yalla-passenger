@@ -21,17 +21,18 @@ class PassengerMainScreen extends StatefulWidget {
 class _PassengerMainScreenState extends State<PassengerMainScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const PassengerHomeScreen(),
-    const PassengerTripsScreen(),
-    const PassengerProfileScreen(),
-  ];
+  late final List<Widget> _screens;
 
   final PageController _pageController = PageController();
 
   @override
   void initState() {
     super.initState();
+    _screens = [
+      const PassengerHomeScreen(),
+      PassengerTripsScreen(onBackToHome: () => _onNavTap(0)),
+      const PassengerProfileScreen(),
+    ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkActiveRide();
     });
@@ -63,14 +64,21 @@ class _PassengerMainScreenState extends State<PassengerMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F7),
-      body: PageView(
-        physics: const NeverScrollableScrollPhysics(),
-        controller: _pageController,
-        children: _screens,
-      ),
-      bottomNavigationBar: Container(
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selectedIndex != 0) {
+          _onNavTap(0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF6F6F7),
+        body: PageView(
+          physics: const NeverScrollableScrollPhysics(),
+          controller: _pageController,
+          children: _screens,
+        ),
+        bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Color(0xFF1E1E20),
           borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
@@ -124,6 +132,7 @@ class _PassengerMainScreenState extends State<PassengerMainScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

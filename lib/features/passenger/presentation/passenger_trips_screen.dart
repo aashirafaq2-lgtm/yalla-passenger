@@ -13,7 +13,8 @@ import '../../../core/network/api_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/providers/locale_provider.dart';
 class PassengerTripsScreen extends StatefulWidget {
-  const PassengerTripsScreen({super.key});
+  final VoidCallback? onBackToHome;
+  const PassengerTripsScreen({super.key, this.onBackToHome});
 
   @override
   State<PassengerTripsScreen> createState() => _PassengerTripsScreenState();
@@ -121,7 +122,13 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                       ),
                       child: IconButton(
                         icon: Icon(isArabic ? Icons.arrow_forward : Icons.arrow_back, color: Colors.black, size: 22),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          if (widget.onBackToHome != null) {
+                            widget.onBackToHome!();
+                          } else if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          }
+                        },
                       ),
                     ),
                   ),
