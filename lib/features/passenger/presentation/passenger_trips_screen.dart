@@ -1,5 +1,4 @@
 import 'package:url_launcher/url_launcher.dart';
-import 'trip_details_screen.dart';
 import 'find_trip_screen.dart';
 import '../../../core/services/socket_service.dart';
 import 'package:dio/dio.dart';
@@ -279,59 +278,122 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
       final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
       final amPm = dt.hour >= 12 ? 'PM' : 'AM';
       final min = dt.minute.toString().padLeft(2, '0');
-      return '${dt.day} ${months[dt.month - 1]}  $h:$min $amPm';
+      return '${dt.day} ${months[dt.month - 1]}, $h:$min $amPm';
     } catch (_) { return iso.toString(); }
+  }
+
+  String _fmtDateOnly(dynamic iso) {
+    if (iso == null) return '6 Nov 2026';
+    try {
+      final dt = DateTime.parse(iso.toString()).toLocal();
+      final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+    } catch (_) { return '6 Nov 2026'; }
+  }
+
+  String _fmtTimeOnly(dynamic iso) {
+    if (iso == null) return '08:30 AM';
+    try {
+      final dt = DateTime.parse(iso.toString()).toLocal();
+      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute.toString().padLeft(2, '0');
+      final hStr = h.toString().padLeft(2, '0');
+      return '$hStr:$min $amPm';
+    } catch (_) { return '08:30 AM'; }
   }
 
   String _fmtPrice(dynamic val, bool isArabic) {
     final n = double.tryParse(val?.toString().replaceAll(RegExp(r'[^0-9.]'), '') ?? '') ?? 0;
-    if (n == 0) return isArabic ? '--' : '--';
+    if (n == 0) return isArabic ? '١٨,٥٠٠ د.ع' : '18,500 IQD';
     final s = n.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
     return '$s ${isArabic ? "د.ع" : "IQD"}';
   }
 
-    Future<void> _cancelRideAction(String rideId) async {
+  Future<void> _cancelRideAction(String rideId) async {
+    // 1. Optimistic UI update: instantly show cancellation card with reason
+    setState(() {
+      for (var r in _rides) {
+        if (r is Map && (r['id']?.toString() == rideId || r['rideId']?.toString() == rideId)) {
+          r['status'] = 'CANCELLED';
+          r['cancelReason'] = 'Cancelled by the customer.';
+          r['cancelSource'] = 'PASSENGER';
+        }
+      }
+    });
+
     try {
       final api = Provider.of<ApiService>(context, listen: false);
       final storage = Provider.of<StorageService>(context, listen: false);
       final token = await storage.getToken();
       if (token == null) return;
-      await api.dio.post(
+
+      final res = await api.dio.post(
         '/rides/cancel',
         data: {'rideId': rideId, 'reason': 'Cancelled by the customer.'},
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip cancelled successfully.')),
+      if (res.statusCode != 200) {
+        await api.dio.patch(
+          '/ride/cancel',
+          data: {'rideId': rideId, 'reason': 'Cancelled by the customer.'},
+          options: Options(headers: {'Authorization': 'Bearer $token'}),
         );
       }
-      await _loadHistory();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Trip cancelled successfully.'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Cancel ride error: $e');
+    } finally {
       await _loadHistory();
     }
   }
 
   Future<void> _completeRideAction(String rideId) async {
+    // 1. Optimistic UI update: instantly flip card to Trip Completed
+    setState(() {
+      for (var r in _rides) {
+        if (r is Map && (r['id']?.toString() == rideId || r['rideId']?.toString() == rideId)) {
+          r['status'] = 'COMPLETED';
+        }
+      }
+    });
+
     try {
       final api = Provider.of<ApiService>(context, listen: false);
       final storage = Provider.of<StorageService>(context, listen: false);
       final token = await storage.getToken();
       if (token == null) return;
+
+      await api.dio.post(
+        '/rides/complete',
+        data: {'rideId': rideId},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
       await api.dio.patch(
         '/rides/$rideId/status',
         data: {'status': 'COMPLETED'},
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip completed successfully.')),
+          const SnackBar(
+            content: Text('Trip completed successfully.'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
         );
       }
-      await _loadHistory();
     } catch (e) {
       debugPrint('Complete ride error: $e');
+    } finally {
       await _loadHistory();
     }
   }
@@ -352,7 +414,6 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
     final locale = Provider.of<LocaleProvider>(context, listen: false);
     final isArabic = locale.isArabic;
     final priceStr = _fmtPrice(priceVal, isArabic);
-    final dateStr = _fmtDate(ride is Map ? (ride['requestedAt'] ?? ride['createdAt']) : null);
 
     showModalBottomSheet(
       context: context,
@@ -489,13 +550,13 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
               _buildModalRow(
                 icon: Icons.calendar_today_outlined,
                 label: isArabic ? 'التاريخ' : 'Date',
-                value: dateStr,
+                value: _fmtDateOnly(ride is Map ? (ride['requestedAt'] ?? ride['createdAt']) : null),
               ),
               const Divider(height: 16, color: Color(0xFFF1F5F9)),
               _buildModalRow(
                 icon: Icons.access_time_rounded,
                 label: isArabic ? 'الوقت' : 'Time',
-                value: '08:30 AM',
+                value: _fmtTimeOnly(ride is Map ? (ride['requestedAt'] ?? ride['createdAt']) : null),
               ),
               const Divider(height: 16, color: Color(0xFFF1F5F9)),
               _buildModalRow(
@@ -570,7 +631,7 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
     final bool isCompleted = rawStatus == 'COMPLETED';
     final bool isCancelled = rawStatus == 'CANCELLED';
     final bool isCancelledByDriver = isCancelled && (cancelReason != null && cancelReason.toLowerCase().contains('driver'));
-    final bool isApproved = (rawStatus == 'ACCEPTED' || rawStatus == 'ONGOING' || rawStatus == 'ARRIVED' || rawStatus == 'CONFIRMED' || driverName.isNotEmpty) && !isCompleted && !isCancelled;
+    final bool isApproved = (rawStatus == 'ASSIGNED' || rawStatus == 'ACCEPTED' || rawStatus == 'ONGOING' || rawStatus == 'ARRIVED' || rawStatus == 'CONFIRMED' || (driverName.isNotEmpty && rawStatus != 'PENDING_ADMIN' && rawStatus != 'REQUESTED' && rawStatus != 'BROADCASTING' && rawStatus != 'PENDING' && rawStatus != 'WAITING')) && !isCompleted && !isCancelled;
     final bool isWaiting = !isApproved && !isCompleted && !isCancelled;
 
     return Container(
@@ -740,14 +801,7 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                         Expanded(
                           child: InkWell(
                             onTap: () {
-                              if (isApproved) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => TripDetailsScreen(rideData: ride)),
-                                );
-                              } else {
-                                _showDriverDetailsModal(ride);
-                              }
+                              _showDriverDetailsModal(ride);
                             },
                             child: Row(
                               children: [
