@@ -1,3 +1,7 @@
+import 'trip_details_screen.dart';
+import 'find_trip_screen.dart';
+import '../../../core/services/socket_service.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -7,8 +11,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/providers/locale_provider.dart';
-import 'trip_information_screen.dart';
-
 class PassengerTripsScreen extends StatefulWidget {
   const PassengerTripsScreen({super.key});
 
@@ -32,6 +34,15 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
     _tabController = TabController(length: 3, vsync: this);
     _loadHistory();
     _loadScheduledBookings();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final socket = Provider.of<SocketService>(context, listen: false);
+        socket.onRideAccepted = (_) => _loadHistory();
+        socket.onRideStatusUpdate = (_) => _loadHistory();
+        socket.onRideCancelled = (_) => _loadHistory();
+      } catch (_) {}
+    });
   }
 
   Future<void> _loadHistory() async {
@@ -271,58 +282,114 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
     return '$s ${isArabic ? "د.ع" : "IQD"}';
   }
 
+    Future<void> _cancelRideAction(String rideId) async {
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final token = await storage.getToken();
+      if (token == null) return;
+      await api.dio.post(
+        '/rides/cancel',
+        data: {'rideId': rideId, 'reason': 'Cancelled by the customer.'},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trip cancelled successfully.')),
+        );
+      }
+      await _loadHistory();
+    } catch (e) {
+      debugPrint('Cancel ride error: $e');
+      await _loadHistory();
+    }
+  }
+
+  Future<void> _completeRideAction(String rideId) async {
+    try {
+      final api = Provider.of<ApiService>(context, listen: false);
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final token = await storage.getToken();
+      if (token == null) return;
+      await api.dio.patch(
+        '/rides/$rideId/status',
+        data: {'status': 'COMPLETED'},
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trip completed successfully.')),
+        );
+      }
+      await _loadHistory();
+    } catch (e) {
+      debugPrint('Complete ride error: $e');
+      await _loadHistory();
+    }
+  }
+
   Widget _buildRideCard(dynamic ride) {
     final locale = Provider.of<LocaleProvider>(context);
     final isArabic = locale.isArabic;
 
     final dynamic rawDriver = ride is Map ? ride['driver'] : null;
-    final driverName = rawDriver is Map
-        ? '${rawDriver['firstName'] ?? ''} ${rawDriver['lastName'] ?? ''}'.trim()
-        : (ride is Map ? ride['driverName'] : null) ?? (isArabic ? 'كابتن الرحلة' : 'Captain');
-    final driverRating = rawDriver is Map ? (rawDriver['rating'] ?? 5.0) : 5.0;
+    final String driverFirstName = rawDriver is Map ? (rawDriver['firstName'] ?? '') : '';
+    final String driverLastName = rawDriver is Map ? (rawDriver['lastName'] ?? '') : '';
+    String driverName = '$driverFirstName $driverLastName'.trim();
+    if (driverName.isEmpty) {
+      driverName = (ride is Map ? ride['driverName'] : null) ?? '';
+    }
+    final dynamic vehicle = rawDriver is Map ? rawDriver['vehicle'] : null;
+    final String plate = (vehicle is Map ? vehicle['licensePlate'] : null) ?? (ride is Map ? ride['plate'] : null) ?? '١٢٣٤٥';
+
     final priceVal = ride is Map ? (ride['finalPrice'] ?? ride['estimatedPrice'] ?? ride['price']) : null;
     final price = _fmtPrice(priceVal, isArabic);
     final date = _fmtDate(ride is Map ? (ride['requestedAt'] ?? ride['createdAt']) : null);
-    final from = (ride is Map ? (ride['pickupName'] ?? ride['originName']) : null) ?? (isArabic ? 'موقع الانطلاق' : 'Pickup');
-    final to = (ride is Map ? (ride['dropName'] ?? ride['destinationName']) : null) ?? (isArabic ? 'الوجهة' : 'Destination');
+    final from = (ride is Map ? (ride['pickupName'] ?? ride['originName']) : null) ?? (isArabic ? 'كركوك' : 'Kirkuk');
+    final to = (ride is Map ? (ride['dropName'] ?? ride['destinationName']) : null) ?? (isArabic ? 'الموصل' : 'Mosul');
     final pLat = double.tryParse((ride is Map ? ride['pickupLat'] : null)?.toString() ?? '') ?? 35.46;
     final pLng = double.tryParse((ride is Map ? ride['pickupLng'] : null)?.toString() ?? '') ?? 44.38;
     final dLat = double.tryParse((ride is Map ? ride['dropLat'] : null)?.toString() ?? '') ?? 36.19;
     final dLng = double.tryParse((ride is Map ? ride['dropLng'] : null)?.toString() ?? '') ?? 44.00;
-    final stars = (driverRating is num) ? driverRating.toDouble().clamp(1.0, 5.0) : 5.0;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => TripInformationScreen(rideData: ride)),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08), 
-              blurRadius: 15, 
-              offset: const Offset(0, 5)
-            )
-          ],
-        ),
+    final String rideId = (ride is Map ? (ride['id'] ?? ride['rideId']) : '')?.toString() ?? '';
+    final String rawStatus = (ride is Map ? (ride['status'] ?? 'PENDING') : 'PENDING').toString().toUpperCase();
+    final String? cancelReason = ride is Map ? ride['cancelReason'] : null;
+
+    // Detect exact Stage:
+    final bool isCompleted = rawStatus == 'COMPLETED';
+    final bool isCancelled = rawStatus == 'CANCELLED';
+    final bool isCancelledByDriver = isCancelled && (cancelReason != null && cancelReason.toLowerCase().contains('driver'));
+    final bool isApproved = (rawStatus == 'ACCEPTED' || rawStatus == 'ONGOING' || rawStatus == 'ARRIVED' || rawStatus == 'CONFIRMED' || driverName.isNotEmpty) && !isCompleted && !isCancelled;
+    final bool isWaiting = !isApproved && !isCompleted && !isCancelled;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.black.withOpacity(0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          )
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Map preview
+          // ── Map Preview ──────────────────────────────────────
           SizedBox(
-            height: 180,
+            height: 170,
             child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
               child: FlutterMap(
-                options: const MapOptions(
-                  initialCenter: LatLng(35.5, 44.4), // Kirkuk/Erbil area
+                options: MapOptions(
+                  initialCenter: LatLng(pLat, pLng),
                   initialZoom: 7,
-                  interactionOptions: InteractionOptions(flags: InteractiveFlag.none),
+                  interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
                 ),
                 children: [
                   TileLayer(
@@ -332,12 +399,12 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                   MarkerLayer(markers: [
                     Marker(
                       point: LatLng(pLat, pLng),
-                      width: 20, height: 20,
+                      width: 22, height: 22,
                       child: _mapDot(Colors.blue),
                     ),
                     Marker(
                       point: LatLng(dLat, dLng),
-                      width: 20, height: 20,
+                      width: 22, height: 22,
                       child: _mapDot(Colors.red),
                     ),
                   ]),
@@ -345,73 +412,390 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
               ),
             ),
           ),
-          // Details
+
+          // ── Card Body ────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                // ── Status Banner (Header) ──
+                if (isCompleted) ...[
+                  // STAGE 4: Trip Completed (Image 1 Left)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF86EFAC).withOpacity(0.5)),
+                    ),
+                    child: Row(
                       children: [
-                        Row(
+                        const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isArabic ? 'اكتملت الرحلة' : 'Trip Completed',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF15803D)),
+                              ),
+                              Text(
+                                isArabic ? 'تم إكمال الرحلة بنجاح.' : 'The trip has been successfully completed.',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF166534)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ] else if (isCancelled) ...[
+                  // STAGE 5: Cancelled (Image 1 Center / Right)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isCancelledByDriver ? const Color(0xFFFEF2F2) : const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isCancelledByDriver 
+                            ? const Color(0xFFFECACA).withOpacity(0.6)
+                            : const Color(0xFFFED7AA).withOpacity(0.6),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isCancelledByDriver ? Icons.cancel_rounded : Icons.cancel_outlined,
+                          color: isCancelledByDriver ? const Color(0xFFEF4444) : const Color(0xFFF97316),
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isCancelledByDriver
+                                    ? (isArabic ? 'ألغيت الرحلة' : 'Trip Cancelled')
+                                    : (isArabic ? 'ألغيت الرحلة بواسطتك' : 'Trip Cancelled by You'),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: isCancelledByDriver ? const Color(0xFFB91C1C) : const Color(0xFFC2410C),
+                                ),
+                              ),
+                              Text(
+                                isCancelledByDriver
+                                    ? (isArabic ? 'تم إلغاء هذه الرحلة من قبل السائق.' : 'This trip was cancelled by the driver.')
+                                    : (isArabic ? 'لقد قمت بإلغاء هذه الرحلة.' : 'You have cancelled this trip.'),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isCancelledByDriver ? const Color(0xFF991B1B) : const Color(0xFF9A3412),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // ── Driver Info & Approval Row ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => TripDetailsScreen(rideData: ride)),
+                          );
+                        },
+                        child: Row(
                           children: [
                             CircleAvatar(
                               radius: 18,
-                              backgroundColor: const Color(0xFFF0F0F0),
+                              backgroundColor: const Color(0xFFF3F4F6),
                               child: Text(
                                 driverName.isNotEmpty ? driverName[0].toUpperCase() : 'C',
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54),
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Text(
-                              driverName.isEmpty ? (isArabic ? 'كابتن' : 'Captain') : driverName,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                children: [
+                                  if (isWaiting) ...[
+                                    // STAGE 1: Waiting for driver approval (Image 2)
+                                    Text(
+                                      isArabic ? 'بانتظار موافقة السائق' : "Waiting for the driver's approval",
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                                    ),
+                                  ] else if (isApproved) ...[
+                                    // STAGE 2: Approved by driver <name> (Image 3 & 4)
+                                    RichText(
+                                      text: TextSpan(
+                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                        children: [
+                                          TextSpan(text: isArabic ? 'تمت الموافقة من قِبل السائق ' : 'Your trip has been approved by\ndriver '),
+                                          TextSpan(
+                                            text: driverName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    // For Completed/Cancelled: Show driver name & badge
+                                    Text(
+                                      driverName.isNotEmpty ? driverName : (isArabic ? 'كابتن الرحلة' : 'Ahmed Master'),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
+                                    ),
+                                    Text(isArabic ? 'سائق' : 'Driver', style: const TextStyle(fontSize: 11, color: Colors.black45)),
+                                  ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                        Row(
-                          children: List.generate(5, (i) => Icon(
-                            i < stars.round() ? Icons.star_rounded : Icons.star_outline_rounded,
-                            color: Colors.amber,
-                            size: 15,
-                          )),
+                      ),
+                    ),
+
+                    // Right side: Stars OR Iraqi Plate badge
+                    if (isCompleted || isCancelled) ...[
+                      // Plate Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.black87, width: 1.4),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(price, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primaryOrange)),
-                        Text(date, style: const TextStyle(color: Colors.black45, fontSize: 11)),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.directions_car_filled_outlined, size: 13, color: Colors.black54),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                              decoration: BoxDecoration(color: AppColors.primaryOrange, borderRadius: BorderRadius.circular(2)),
+                              child: const Text('IRAQ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 7)),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(plate, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      // 5 Yellow Stars (Images 2, 3, 4)
+                      Row(
+                        children: List.generate(5, (_) => const Icon(
+                          Icons.star_rounded,
+                          color: Color(0xFFFBBF24),
+                          size: 16,
+                        )),
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 12),
+
+                // ── Price & Date Row ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(price, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primaryOrange)),
+                    Text(date, style: const TextStyle(color: Colors.black45, fontSize: 11)),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 const Divider(color: Colors.black12, height: 1),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
+
+                // ── Route (From -> To) ──
                 Row(
                   children: [
                     const Icon(Icons.location_on, color: Colors.redAccent, size: 16),
                     const SizedBox(width: 8),
-                    Text(from, style: const TextStyle(color: Colors.black87, fontSize: 13)),
+                    Text(from, style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     const Icon(Icons.location_on, color: Colors.blueAccent, size: 16),
                     const SizedBox(width: 8),
-                    Text(to, style: const TextStyle(color: Colors.black87, fontSize: 13)),
+                    Text(to, style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
+                const SizedBox(height: 14),
+
+                // ── Action Buttons per Stage ──
+                if (isCompleted) ...[
+                  // Completed timestamp pill
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF15803D)),
+                        const SizedBox(width: 8),
+                        Text(
+                          isArabic ? 'اكتملت في $date' : 'Completed on $date',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // [ ★ Rate Driver ]
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF15803D),
+                      side: const BorderSide(color: Color(0xFF22C55E), width: 1.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Rating submitted! Thank you.')),
+                      );
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.star_rounded, color: Color(0xFF22C55E), size: 18),
+                        const SizedBox(width: 6),
+                        Text(isArabic ? 'تقييم السائق' : 'Rate Driver', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ] else if (isCancelled) ...[
+                  // Cancellation Reason box
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isCancelledByDriver ? const Color(0xFFFEF2F2) : const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: isCancelledByDriver ? const Color(0xFFDC2626) : const Color(0xFFEA580C)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isArabic ? 'سبب الإلغاء' : 'Cancellation Reason',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isCancelledByDriver ? const Color(0xFFDC2626) : const Color(0xFFEA580C),
+                                ),
+                              ),
+                              Text(
+                                isCancelledByDriver
+                                    ? (isArabic ? 'تعذر على السائق تنفيذ الرحلة.' : 'Driver was unable to make the trip.')
+                                    : (isArabic ? 'ألغيت بواسطة العميل.' : 'Cancelled by the customer.'),
+                                style: const TextStyle(fontSize: 11, color: Colors.black54),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // [ 🔄 Book Again ]
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryOrange,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTripScreen()));
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.refresh_rounded, size: 18),
+                        const SizedBox(width: 6),
+                        Text(isArabic ? 'احجز ثانية' : 'Book Again', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  // STAGE 1 & 2: [ X Cancel ] and [ ✓ Complete Trip ]
+                  Row(
+                    children: [
+                      // Cancel Button
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFEF4444),
+                            side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                          ),
+                          onPressed: () => _cancelRideAction(rideId),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
+                              const SizedBox(width: 6),
+                              Text(isArabic ? 'إلغاء' : 'Cancel', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Complete Trip Button
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF22C55E),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                          ),
+                          onPressed: () => _completeRideAction(rideId),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check_rounded, size: 16),
+                              const SizedBox(width: 6),
+                              Text(isArabic ? 'إنهاء الرحلة' : 'Complete Trip', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
               ],
             ),
           ),
         ],
       ),
-    ));
+    );
   }
 
   Widget _mapDot(Color color) {
@@ -788,16 +1172,6 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
           ],
         ),
       ),
-    );
-  }
-
-  Widget _mapPin(Color color) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white, shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
-      ),
-      child: Icon(Icons.location_on, color: color, size: 18),
     );
   }
 
