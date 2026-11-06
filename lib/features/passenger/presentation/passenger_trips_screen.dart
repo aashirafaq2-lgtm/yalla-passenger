@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import 'trip_details_screen.dart';
 import 'find_trip_screen.dart';
 import '../../../core/services/socket_service.dart';
@@ -328,6 +329,208 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
     }
   }
 
+  void _showDriverDetailsModal(dynamic ride) {
+    final dynamic rawDriver = ride is Map ? ride['driver'] : null;
+    final String driverFirstName = rawDriver is Map ? (rawDriver['firstName'] ?? '') : '';
+    final String driverLastName = rawDriver is Map ? (rawDriver['lastName'] ?? '') : '';
+    String driverName = '$driverFirstName $driverLastName'.trim();
+    if (driverName.isEmpty) {
+      driverName = (ride is Map ? ride['driverName'] : null) ?? 'Ahmed Master';
+    }
+    final String phone = (rawDriver is Map ? rawDriver['phone'] : null) ?? (ride is Map ? ride['driverPhone'] : null) ?? '+964 770 123 4567';
+    final dynamic vehicle = rawDriver is Map ? rawDriver['vehicle'] : null;
+    final String carModel = (vehicle is Map ? (vehicle['model'] ?? vehicle['brand']) : null) ?? (ride is Map ? ride['carModel'] : null) ?? 'Toyota Hilux';
+    final String plateNumber = (vehicle is Map ? vehicle['licensePlate'] : null) ?? (ride is Map ? ride['plate'] : null) ?? '22 A 45321';
+    final priceVal = ride is Map ? (ride['finalPrice'] ?? ride['estimatedPrice'] ?? ride['price']) : null;
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final isArabic = locale.isArabic;
+    final priceStr = _fmtPrice(priceVal, isArabic);
+    final dateStr = _fmtDate(ride is Map ? (ride['requestedAt'] ?? ride['createdAt']) : null);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Pull handle
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Title row with close icon
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(width: 24),
+                  Text(
+                    isArabic ? 'تفاصيل السائق' : 'Driver Details',
+                    style: TextStyle(
+                      fontFamily: isArabic ? 'NotoKufiArabic' : null,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1E293B),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20, color: Colors.black54),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Driver Card (Photo, Name, Rating, Call Button)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: const Color(0xFFE2E8F0),
+                      child: Text(
+                        driverName.isNotEmpty ? driverName[0].toUpperCase() : 'D',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFF475569)),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            driverName,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: const [
+                              Icon(Icons.star_rounded, color: Color(0xFFFBBF24), size: 16),
+                              SizedBox(width: 4),
+                              Text(
+                                '4.9 (328 Trips)',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Call Button
+                    InkWell(
+                      onTap: () async {
+                        final clean = phone.replaceAll(RegExp(r'\s+'), '');
+                        final uri = Uri(scheme: 'tel', path: clean);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(50),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3E8FF),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFE9D5FF)),
+                        ),
+                        child: const Icon(Icons.phone_rounded, color: Color(0xFF7E22CE), size: 20),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Key-Value Rows (Car, Plate Number, Date, Time, Trip Price)
+              _buildModalRow(
+                icon: Icons.directions_car_outlined,
+                label: isArabic ? 'السيارة' : 'Car',
+                value: carModel,
+              ),
+              const Divider(height: 16, color: Color(0xFFF1F5F9)),
+              _buildModalRow(
+                icon: Icons.badge_outlined,
+                label: isArabic ? 'رقم اللوحة' : 'Plate Number',
+                value: plateNumber,
+              ),
+              const Divider(height: 16, color: Color(0xFFF1F5F9)),
+              _buildModalRow(
+                icon: Icons.calendar_today_outlined,
+                label: isArabic ? 'التاريخ' : 'Date',
+                value: dateStr,
+              ),
+              const Divider(height: 16, color: Color(0xFFF1F5F9)),
+              _buildModalRow(
+                icon: Icons.access_time_rounded,
+                label: isArabic ? 'الوقت' : 'Time',
+                value: '08:30 AM',
+              ),
+              const Divider(height: 16, color: Color(0xFFF1F5F9)),
+              _buildModalRow(
+                icon: Icons.account_balance_wallet_outlined,
+                label: isArabic ? 'سعر الرحلة' : 'Trip Price',
+                value: priceStr,
+                valueColor: AppColors.primaryOrange,
+                isBold: true,
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModalRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+    bool isBold = false,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF64748B)),
+        const SizedBox(width: 10),
+        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+            color: valueColor ?? const Color(0xFF0F172A),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRideCard(dynamic ride) {
     final locale = Provider.of<LocaleProvider>(context);
     final isArabic = locale.isArabic;
@@ -513,45 +716,85 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                     Expanded(
                       child: InkWell(
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => TripDetailsScreen(rideData: ride)),
-                          );
+                          if (isApproved) {
+                            _showDriverDetailsModal(ride);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => TripDetailsScreen(rideData: ride)),
+                            );
+                          }
                         },
                         child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: const Color(0xFFF3F4F6),
-                              child: Text(
-                                driverName.isNotEmpty ? driverName[0].toUpperCase() : 'C',
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                            if (isWaiting) ...[
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFAF5FF),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFFE9D5FF), width: 1.5),
+                                ),
+                                child: const Icon(Icons.access_time_rounded, color: Color(0xFF7E22CE), size: 16),
                               ),
-                            ),
+                            ] else if (isApproved) ...[
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF22C55E),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                              ),
+                            ] else ...[
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: const Color(0xFFF3F4F6),
+                                child: Text(
+                                  driverName.isNotEmpty ? driverName[0].toUpperCase() : 'C',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                                ),
+                              ),
+                            ],
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                                 children: [
                                   if (isWaiting) ...[
-                                    // STAGE 1: Waiting for driver approval (Image 2)
+                                    // STAGE 1: Waiting for Driver's Approval (Exact replica of WhatsApp Image 1 Left)
                                     Text(
-                                      isArabic ? 'بانتظار موافقة السائق' : "Waiting for the driver's approval",
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                                      isArabic ? "بانتظار موافقة السائق" : "Waiting for Driver's Approval",
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)),
                                     ),
                                   ] else if (isApproved) ...[
-                                    // STAGE 2: Approved by driver <name> (Image 3 & 4)
-                                    RichText(
-                                      text: TextSpan(
-                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                        children: [
-                                          TextSpan(text: isArabic ? 'تمت الموافقة من قِبل السائق ' : 'Your trip has been approved by\ndriver '),
-                                          TextSpan(
-                                            text: driverName,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange),
+                                    // STAGE 2: Your Request is Approved -> Your driver: Ahmed Master > (Exact replica of WhatsApp Image 1 Right)
+                                    Text(
+                                      isArabic ? "تمت الموافقة على طلبك" : "Your Request is Approved",
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          isArabic ? "السائق: " : "Your driver: ",
+                                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                        ),
+                                        Text(
+                                          driverName,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF7E22CE),
+                                            decoration: TextDecoration.underline,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF7E22CE)),
+                                      ],
                                     ),
                                   ] else ...[
                                     // For Completed/Cancelled: Show driver name & badge
@@ -744,7 +987,7 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                   // STAGE 1 & 2: [ X Cancel ] and [ ✓ Complete Trip ]
                   Row(
                     children: [
-                      // Cancel Button
+                      // Cancel Button (Always enabled during waiting or approved)
                       Expanded(
                         child: OutlinedButton(
                           style: OutlinedButton.styleFrom(
@@ -759,27 +1002,29 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                             children: [
                               const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
                               const SizedBox(width: 6),
-                              Text(isArabic ? 'إلغاء' : 'Cancel', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(isArabic ? 'إلغاء الرحلة' : 'Cancel Trip', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Complete Trip Button
+                      // Complete Trip Button (Greyed out & disabled during WAITING stage; Green & enabled once APPROVED)
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF22C55E),
-                            foregroundColor: Colors.white,
+                            backgroundColor: isApproved ? const Color(0xFF22C55E) : const Color(0xFFE2E8F0),
+                            foregroundColor: isApproved ? Colors.white : const Color(0xFF94A3B8),
+                            disabledBackgroundColor: const Color(0xFFE2E8F0),
+                            disabledForegroundColor: const Color(0xFF94A3B8),
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: const EdgeInsets.symmetric(vertical: 11),
                           ),
-                          onPressed: () => _completeRideAction(rideId),
+                          onPressed: isApproved ? () => _completeRideAction(rideId) : null,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.check_rounded, size: 16),
+                              Icon(Icons.check_rounded, size: 16, color: isApproved ? Colors.white : const Color(0xFF94A3B8)),
                               const SizedBox(width: 6),
                               Text(isArabic ? 'إنهاء الرحلة' : 'Complete Trip', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ],
