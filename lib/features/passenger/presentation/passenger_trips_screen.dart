@@ -710,38 +710,121 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                 ],
 
                 // ── Driver Info & Approval Row ──
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          _showDriverDetailsModal(ride);
-                        },
-                        child: Row(
-                          children: [
-                            if (isWaiting) ...[
-                              Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFAF5FF),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: const Color(0xFFE9D5FF), width: 1.5),
+                if (isWaiting || isApproved) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isWaiting ? const Color(0xFFFAF5FF) : const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isWaiting ? const Color(0xFFE9D5FF) : const Color(0xFFBBF7D0),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              _showDriverDetailsModal(ride);
+                            },
+                            child: Row(
+                              children: [
+                                if (isWaiting) ...[
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFAF5FF),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: const Color(0xFFE9D5FF), width: 1.5),
+                                    ),
+                                    child: const Icon(Icons.access_time_rounded, color: Color(0xFF7E22CE), size: 16),
+                                  ),
+                                ] else ...[
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF22C55E),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                                  ),
+                                ],
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      if (isWaiting) ...[
+                                        // STAGE 1: Waiting for Driver's Approval (Exact replica of WhatsApp Image 1 Left)
+                                        Text(
+                                          isArabic ? "بانتظار موافقة السائق" : "Waiting for Driver's Approval",
+                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)),
+                                        ),
+                                      ] else ...[
+                                        // STAGE 2: Your Request is Approved -> Your driver: Ahmed Master > (Exact replica of WhatsApp Image 1 Right)
+                                        Text(
+                                          isArabic ? "تمت الموافقة على طلبك" : "Your Request is Approved",
+                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              isArabic ? "السائق: " : "Your driver: ",
+                                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                            ),
+                                            Text(
+                                              driverName,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF7E22CE),
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF7E22CE)),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
-                                child: const Icon(Icons.access_time_rounded, color: Color(0xFF7E22CE), size: 16),
-                              ),
-                            ] else if (isApproved) ...[
-                              Container(
-                                width: 28,
-                                height: 28,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF22C55E),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                              ),
-                            ] else ...[
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Right side: 5 Stars for Waiting stage (Image 1 Left)
+                        if (isWaiting) ...[
+                          Row(
+                            children: List.generate(5, (_) => const Icon(
+                              Icons.star_rounded,
+                              color: Color(0xFFFBBF24),
+                              size: 16,
+                            )),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  // For Completed/Cancelled: Show standard Driver info row with Plate Badge
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            _showDriverDetailsModal(ride);
+                          },
+                          child: Row(
+                            children: [
                               CircleAvatar(
                                 radius: 16,
                                 backgroundColor: const Color(0xFFF3F4F6),
@@ -750,63 +833,23 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                                   style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
                                 ),
                               ),
-                            ],
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                children: [
-                                  if (isWaiting) ...[
-                                    // STAGE 1: Waiting for Driver's Approval (Exact replica of WhatsApp Image 1 Left)
-                                    Text(
-                                      isArabic ? "بانتظار موافقة السائق" : "Waiting for Driver's Approval",
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF0F172A)),
-                                    ),
-                                  ] else if (isApproved) ...[
-                                    // STAGE 2: Your Request is Approved -> Your driver: Ahmed Master > (Exact replica of WhatsApp Image 1 Right)
-                                    Text(
-                                      isArabic ? "تمت الموافقة على طلبك" : "Your Request is Approved",
-                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          isArabic ? "السائق: " : "Your driver: ",
-                                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                                        ),
-                                        Text(
-                                          driverName,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFF7E22CE),
-                                            decoration: TextDecoration.underline,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 2),
-                                        const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF7E22CE)),
-                                      ],
-                                    ),
-                                  ] else ...[
-                                    // For Completed/Cancelled: Show driver name & badge
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                  children: [
                                     Text(
                                       driverName.isNotEmpty ? driverName : (isArabic ? 'كابتن الرحلة' : 'Ahmed Master'),
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
                                     ),
                                     Text(isArabic ? 'سائق' : 'Driver', style: const TextStyle(fontSize: 11, color: Colors.black45)),
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-
-                    // Right side: Stars OR Iraqi Plate badge
-                    if (isCompleted || isCancelled) ...[
                       // Plate Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -830,18 +873,9 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                           ],
                         ),
                       ),
-                    ] else ...[
-                      // 5 Yellow Stars (Images 2, 3, 4)
-                      Row(
-                        children: List.generate(5, (_) => const Icon(
-                          Icons.star_rounded,
-                          color: Color(0xFFFBBF24),
-                          size: 16,
-                        )),
-                      ),
                     ],
-                  ],
-                ),
+                  ),
+                ],
                 const SizedBox(height: 12),
 
                 // ── Price & Date Row ──
