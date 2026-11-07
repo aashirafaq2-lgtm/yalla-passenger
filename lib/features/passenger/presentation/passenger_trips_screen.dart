@@ -1112,29 +1112,27 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                             children: [
                               const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
                               const SizedBox(width: 6),
-                              Text(isArabic ? 'إلغاء الرحلة' : 'Cancel Trip', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(isArabic ? 'إلغاء' : 'Cancel', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Complete Trip Button (Greyed out & disabled during WAITING stage; Green & enabled once APPROVED)
+                      // Complete Trip Button (Green & enabled for passenger to complete trip)
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isApproved ? const Color(0xFF22C55E) : const Color(0xFFE2E8F0),
-                            foregroundColor: isApproved ? Colors.white : const Color(0xFF94A3B8),
-                            disabledBackgroundColor: const Color(0xFFE2E8F0),
-                            disabledForegroundColor: const Color(0xFF94A3B8),
+                            backgroundColor: const Color(0xFF22C55E),
+                            foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: const EdgeInsets.symmetric(vertical: 11),
                           ),
-                          onPressed: isApproved ? () => _completeRideAction(rideId) : null,
+                          onPressed: () => _completeRideAction(rideId),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.check_rounded, size: 16, color: isApproved ? Colors.white : const Color(0xFF94A3B8)),
+                              const Icon(Icons.check_rounded, size: 16, color: Colors.white),
                               const SizedBox(width: 6),
                               Text(isArabic ? 'إنهاء الرحلة' : 'Complete Trip', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ],
