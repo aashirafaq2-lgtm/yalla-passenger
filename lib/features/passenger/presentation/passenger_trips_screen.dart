@@ -630,8 +630,16 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
     // Detect exact Stage:
     final bool isCompleted = rawStatus == 'COMPLETED';
     final bool isCancelled = rawStatus == 'CANCELLED';
-    final bool isCancelledByDriver = isCancelled && (cancelReason != null && cancelReason.toLowerCase().contains('driver'));
-    final bool isApproved = (rawStatus == 'ASSIGNED' || rawStatus == 'ACCEPTED' || rawStatus == 'ONGOING' || rawStatus == 'ARRIVED' || rawStatus == 'CONFIRMED' || (driverName.isNotEmpty && rawStatus != 'PENDING_ADMIN' && rawStatus != 'REQUESTED' && rawStatus != 'BROADCASTING' && rawStatus != 'PENDING' && rawStatus != 'WAITING')) && !isCompleted && !isCancelled;
+    final bool isCancelledByDriver = isCancelled && (cancelReason != null &&
+        (cancelReason.toLowerCase().contains('driver') || (ride is Map && (ride['cancelSource']?.toString().toUpperCase() == 'DRIVER'))));
+    // isApproved = driver has been EXPLICITLY assigned (status must be one of the approved states)
+    final bool isApproved = !isCompleted && !isCancelled &&
+        (rawStatus == 'ASSIGNED' ||
+         rawStatus == 'ACCEPTED' ||
+         rawStatus == 'ONGOING' ||
+         rawStatus == 'ARRIVED' ||
+         rawStatus == 'IN_PROGRESS' ||
+         rawStatus == 'CONFIRMED');
     final bool isWaiting = !isApproved && !isCompleted && !isCancelled;
 
     return Container(
@@ -800,9 +808,9 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () {
+                            onTap: isApproved ? () {
                               _showDriverDetailsModal(ride);
-                            },
+                            } : null,
                             child: Row(
                               children: [
                                 if (isWaiting) ...[
@@ -894,16 +902,16 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                     children: [
                       Expanded(
                         child: InkWell(
-                          onTap: () {
-                            _showDriverDetailsModal(ride);
-                          },
+                          onTap: (driverName.isNotEmpty || (rawDriver != null))
+                              ? () => _showDriverDetailsModal(ride)
+                              : null,
                           child: Row(
                             children: [
                               CircleAvatar(
                                 radius: 16,
                                 backgroundColor: const Color(0xFFF3F4F6),
                                 child: Text(
-                                  driverName.isNotEmpty ? driverName[0].toUpperCase() : 'C',
+                                  driverName.isNotEmpty ? driverName[0].toUpperCase() : 'D',
                                   style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
                                 ),
                               ),
@@ -913,7 +921,7 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                                   crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      driverName.isNotEmpty ? driverName : (isArabic ? 'كابتن الرحلة' : 'Ahmed Master'),
+                                      driverName.isNotEmpty ? driverName : (isArabic ? 'سائق' : 'Driver'),
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
                                     ),
                                     Text(isArabic ? 'سائق' : 'Driver', style: const TextStyle(fontSize: 11, color: Colors.black45)),
@@ -925,28 +933,29 @@ class _PassengerTripsScreenState extends State<PassengerTripsScreen>
                         ),
                       ),
                       // Plate Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.black87, width: 1.4),
+                      if (plate.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.black87, width: 1.4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.directions_car_filled_outlined, size: 13, color: Colors.black54),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                decoration: BoxDecoration(color: AppColors.primaryOrange, borderRadius: BorderRadius.circular(2)),
+                                child: const Text('IRAQ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 7)),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(plate, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.directions_car_filled_outlined, size: 13, color: Colors.black54),
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                              decoration: BoxDecoration(color: AppColors.primaryOrange, borderRadius: BorderRadius.circular(2)),
-                              child: const Text('IRAQ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 7)),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(plate, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ],
